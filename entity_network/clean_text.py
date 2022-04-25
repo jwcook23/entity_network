@@ -1,7 +1,27 @@
 '''Text cleaning functions for different categories of data.'''
 
+from email.policy import default
+from tracemalloc import stop
 from pandas import DataFrame, Series, NA
 from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
+
+default_stopwords = {
+    'name': list(ENGLISH_STOP_WORDS),
+    'phone': [
+        # words containing only one repeating digit
+        r'^(\d)\1+$'
+    ],
+    'email': ['no_reply'],
+    'email_domain': [
+        # common domains
+        '.com','.net','.org',
+        # common domain names
+        'gmail', 'yahoo', 'hotmail','aol','msn','noreply','comcast','outlook',
+        'att','verizon','icloud',
+    ],
+    'address': list(ENGLISH_STOP_WORDS)
+}
+
 
 def _alphanumeric_only(prepared):
 
@@ -31,8 +51,13 @@ def _common_poststeps(prepared):
     return prepared
 
 
-def _remove_stopwords(prepared, stopwords): 
+def _remove_stopwords(prepared, stopwords, category): 
 
+    if stopwords is None:
+        return prepared
+    elif stopwords=='default':
+        stopwords = default_stopwords[category]
+    
     pattern = r'\b(?:{})\b'.format('|'.join(stopwords))
     prepared = prepared.str.replace(pattern, '', regex=True)
 
@@ -58,7 +83,7 @@ def possible_stopwords(values) -> Series:
     return possible_stopwords
 
 
-def name(values: Series) -> Series:
+def name(values: Series, stopwords='default') -> Series:
     '''Prepocess comapany and person names.
 
     Parameters
@@ -74,25 +99,12 @@ def name(values: Series) -> Series:
     prepared = _alphanumeric_only(prepared)
 
     # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
-    stopwords = list(ENGLISH_STOP_WORDS)
-    stopwords = stopwords+[
-        # generic
-        'company','associates','group','corporation',
-        'llc','inc','law','corp','group','na',
-        # industry specific
-        'insurance','claim','claims',
-        'mortgage','loan','loans','bank','isaoa','atima','financial',
-        'adjusters','adjusting','agency','pa',
-        'remodeling','service','services','servicing',
-        'consulting','consultants','restoration','reporting',
-        
-    ]
-    prepared = _remove_stopwords(prepared, stopwords)
+    prepared = _remove_stopwords(prepared, stopwords, 'name')
 
     return _common_poststeps(prepared)
 
 
-def phone(values: Series) -> Series:
+def phone(values: Series, stopwords='default') -> Series:
     '''Prepocess phone numbers.
 
     Parameters
@@ -106,23 +118,19 @@ def phone(values: Series) -> Series:
 
     prepared = _common_presteps(values)
 
+    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
+    prepared = _remove_stopwords(prepared, stopwords, 'phone')
+
     # remove trailing zeros with decimal from mixed types
     prepared = prepared.replace('\.0$', '', regex=True)
 
     # keep numbers only
     prepared = prepared.replace(r'[^0-9]+', '', regex=True)
 
-    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
-    stopwords = [
-        # words containing only one repeating digit
-        r'^(\d)\1+$'
-    ]
-    prepared = _remove_stopwords(prepared, stopwords)
-
     return _common_poststeps(prepared)
 
 
-def email(values: Series) -> Series:
+def email(values: Series, stopwords='default') -> Series:
     '''Prepocess email addresses.
 
     Parameters
@@ -136,36 +144,33 @@ def email(values: Series) -> Series:
     prepared['email_domain'] (Series) : email domain after processing
     '''
 
-    email = _common_email(values)
+    prepared = _common_email(values)
+
+    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
+    prepared = _remove_stopwords(prepared, stopwords, 'email')
 
     # keep only letters and numbers
-    email = email.str.replace(r'[\W_]+','', regex=True)
+    prepared = prepared.str.replace(r'[\W_]+','', regex=True)
 
-    return _common_poststeps(email)
+    return _common_poststeps(prepared)
 
 
-def email_domain(values: Series) ->Series:
+def email_domain(values: Series, stopwords='default') ->Series:
 
-    email = _common_email(values)
+    prepared = _common_email(values)
 
     # parse email domain
-    domain = email.str.extract('@(.*)')
-    stopwords = [
-        # common domains
-        '.com','.net','.org',
-        # common domain names
-        'gmail', 'yahoo', 'hotmail','aol','msn','noreply','comcast','outlook',
-        'att','verizon','icloud',
-        # common insurance domain names
-        'statefarm','allstate'
-    ]
-    if domain.shape[1]>1:
+    prepared = prepared.str.extract('@(.*)')
+    if prepared.shape[1]>1:
         raise NotImplementedError('Multiple domains detected.')
     else:
-        domain = domain[0]
-    domain = _remove_stopwords(domain, stopwords)
+        prepared = prepared[0]
+    prepared = _remove_stopwords(prepared, stopwords)
 
-    return _common_poststeps(domain)
+    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
+    prepared = _remove_stopwords(prepared, stopwords, 'email_domain')
+
+    return _common_poststeps(prepared)
 
 
 def _common_email(values:Series):
@@ -175,17 +180,10 @@ def _common_email(values:Series):
     # remove all spaces
     email = email.replace(r'\s+', '', regex=True)
 
-    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
-    stopwords = [
-        # empty filler values
-        'noreply@noreply.com',
-    ]
-    email = _remove_stopwords(email, stopwords)
-
     return email
 
 
-def address(values: Series) -> Series:
+def address(values: Series, stopwords='default') -> Series:
     '''Prepocess street addresses.
 
     Parameters
@@ -198,6 +196,9 @@ def address(values: Series) -> Series:
     '''
 
     prepared = _common_presteps(values)
+
+    # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
+    prepared = _remove_stopwords(prepared, stopwords, 'address')
 
     # remove ZIP+4 since commonly isn't given
     prepared = prepared.replace(to_replace=r'-\d+$', value='', regex=True)

@@ -13,7 +13,7 @@ def df():
     df.loc[3] = [None, "John Smith", None, None, None, "john.smith@companyname.org", None]
     df.loc[4] = [None, "First Last", None, None, None, "blah_blah@companyname.org", None]
     df.loc[5] = ["NameA NameB", "NameA NameB", "123-444-4444", None, None, None, None]
-    df.loc[6] = [None, "NameC", None, None, "123 444 4444", None, None]
+    df.loc[6] = [None, "NameC", None, "(1) 123-456-7890 ext 11", "123 444 4444", None, None]
     df.loc[7] = ["Foo Bar", None, None, None, None, "blahblah@companyname.org", None]
 
     yield df
@@ -82,21 +82,27 @@ def test_network_simple(df):
     assert df[df_input.columns].equals(df_input)
 
 
-def test_network_exact(df):
-
-    er = entity_resolver.entity_resolver(df)
-    er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=1)
-    # er.compare('email', columns=['Email'], kneighbors=10, threshold=1)
-    # er.compare('address', columns=['Address'], threshold=0.8)
-
 def test_network_similar(df):
     
-    er = entity_resolver.entity_resolver(df)
-    # er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=0.9)
-    er.compare('email', columns=['Email'], kneighbors=10, threshold=0.95)
-    # er.compare('address', columns=['Address'], threshold=0.8)
-    assert isinstance(df, pd.DataFrame)
+    df_input = df.copy()
 
+    # compare values
+    er = entity_resolver.entity_resolver(df)
+    er.compare('email', columns=['Email'], kneighbors=10, threshold=0.8)
+    er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=1)
+
+    # compute entity
+    df, entity_id, entity_feature = er.entity(columns=['CompanyName','PersonName'], kneighbors=10, threshold=0.6, analyzer='word')
+    assert df.at[0,'entity_id']==0
+    assert entity_id.at[0,'entity_id']==0
+    assert entity_feature.loc[0].equals(pd.DataFrame({'category': ['email','phone'], 'entity_id': [0,0]}, index=[0,0]))
+    # no match on similarity since non-exact matches become exact after preprocessing
+    assert len(er.similar['email'])==0
+    # a similar name match
+    assert er.similar['name'][['index','index_similar']].equals(pd.DataFrame({'index': [0,1], 'index_similar': [1,0]}))
+
+
+    assert 1==1
 
 def test_network_kneighbors_threshold():
 

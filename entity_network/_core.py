@@ -5,14 +5,14 @@ import networkx as nx
 
 from entity_network import clean_text, _exceptions
 
-category_processors = {
+default_preprocessor = {
     'name': clean_text.name,
     'phone': clean_text.phone,
     'email': clean_text.email,
     'email_domain': clean_text.email_domain,
     'address': clean_text.address
 }
-category_analyzer = {
+default_analyzer = {
     'name': 'char',
     'phone': 'char',
     'email': 'char',
@@ -20,11 +20,11 @@ category_analyzer = {
     'address': 'word'
 }
 
-def prepare_values(df, category, columns):
+def prepare_values(df, category, columns, preprocessor):
 
     # check allowed category argument
-    if not category in category_processors:
-        raise _exceptions.InvalidCategory(f'Argument catgeory must be one of: {category_processors}')
+    if not category in default_preprocessor:
+        raise _exceptions.InvalidCategory(f'Argument catgeory must be one of: {default_preprocessor}')
 
     # check and prepare column argument
     if isinstance(columns, str):
@@ -38,12 +38,15 @@ def prepare_values(df, category, columns):
     values = df[columns].stack()
 
     # preprocess values by category type
-    values = category_processors[category](values)
+    if preprocessor=='default':
+        values = default_preprocessor[category](values)
+    else:
+        values = preprocessor(values)
 
     return values
 
 
-def find_related(category, values, kneighbors, threshold):
+def find_related(category, values, kneighbors, threshold, analyzer):
 
     # check kneighbors argument
     if not isinstance(kneighbors, int) or kneighbors<0:
@@ -67,10 +70,15 @@ def find_related(category, values, kneighbors, threshold):
         # remove duplicates to lower computations needed for similar matching
         unique = values.drop_duplicates()
 
+        # remove missing values that were completely removed during preprocessing
+        unique = unique.dropna()
+
         # create TF-IDF matrix
+        if analyzer=='default':
+            analyzer = default_analyzer[category]
         vectorizer = TfidfVectorizer(
             # create features using words or characters
-            analyzer=category_analyzer[category],
+            analyzer=analyzer,
             # require 1 alphanumeric character instead of 2 to identify a word 
             token_pattern=r'(?u)\b\w+\b',
             # performed during preprocessing
@@ -98,9 +106,10 @@ def find_related(category, values, kneighbors, threshold):
         similar['score'] = similar['score']*-1
 
         # check kneighbors and threshold comination potentially excluding matches
-        last = similar.groupby('tfidf_index').agg({'score': min})
-        if any(last['score']>threshold):
-            raise _exceptions.KneighborsThreshold(f'Similar matches excluded with kneighbors={kneighbors} and threshold={threshold}')
+        # TODO: issue warning or raise exception if possible
+        # last = similar.groupby('tfidf_index').agg({'score': min})
+        # if any(last['score']>threshold):
+        #     raise _exceptions.KneighborsThreshold(f'Similar matches excluded with kneighbors={kneighbors} and threshold={threshold}')
 
         # ignore matches to the same value
         similar = similar[similar['tfidf_index']!=similar['other_index']]
@@ -137,7 +146,7 @@ def find_related(category, values, kneighbors, threshold):
 
     # format return datatypes the same for exact or similar
     related = related.astype({'index': 'int64', 'column': 'string', 'id_exact': 'int64', 'id_similar': 'Int64', 'id': 'int64'})
-    similar = similar.astype({'score': 'float64', 'id_similar': 'int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'int64'})
+    similar = similar.astype({'score': 'float64', 'id_similar': 'int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'string'})
 
     # add caregory description to ids for traceability
     related.columns = related.columns.str.replace(r'^id', f'{category}_id', regex=True)

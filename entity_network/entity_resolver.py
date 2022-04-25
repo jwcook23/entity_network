@@ -19,47 +19,48 @@ class entity_resolver():
         self.entity_id = None
         self.network_feature = None
         self.network_id = None
+        self.related = {}
+        self.similar = {}
 
         self._df = df
-        self._compare_other = []
-        self._compare_processed = {}
-        self._compare_graph = {}
-        self._compare_related = {}
-        self._compare_similar = {}
+        self._other = []
+        self._processed = {}
 
 
-    def compare(self, category, columns, kneighbors, threshold):
+    def compare(self, category, columns, kneighbors, threshold, analyzer='default', preprocessor='default'):
 
         # track other categories compared beside name which form a network
         if category!='name':
-            self._compare_other.append(category)
+            self._other.append(category)
 
         # prepare values for comparison
-        self._compare_processed[category] = _core.prepare_values(self._df, category, columns)
-        self._compare_processed[category].index.names = ('index', 'column')
-        self._compare_processed[category].name = category
+        self._processed[category] = _core.prepare_values(self._df, category, columns, preprocessor)
+        self._processed[category].index.names = ('index', 'column')
+        self._processed[category].name = category
 
         # ignore values the processor completely removed
-        # self._compare_processed[category] = self._compare_processed[category].dropna()
+        # self._processed[category] = self._processed[category].dropna()
 
         # compare values on similarity threshold
-        related, similar = _core.find_related(category, self._compare_processed[category], kneighbors=kneighbors, threshold=threshold)
-        self._compare_related[category] = related
-        self._compare_similar[category] = similar
+        related, similar = _core.find_related(category, self._processed[category], kneighbors=kneighbors, threshold=threshold, analyzer=analyzer)
+        self.related[category] = related
+        self.similar[category] = similar
+
+        return similar
 
 
-    def entity(self, columns, kneighbors, threshold):
+    def entity(self, columns, kneighbors, threshold, analyzer=None):
 
-        self.compare('name', columns, kneighbors, threshold)
+        self.compare('name', columns, kneighbors, threshold, analyzer)
 
         # form graph of matching names
-        self._compare_graph['name'] = _conversion.from_pandas_df_id(self._compare_related['name'], 'name_id')
+        name = _conversion.from_pandas_df_id(self.related['name'], 'name_id')
 
         # compare name graph to graphs of other features to resolve entities
         self.entity_feature = []
-        for c in self._compare_other:
-            self._compare_graph[c] = _conversion.from_pandas_df_id(self._compare_related[c], f'{c}_id')
-            other = nx.intersection(self._compare_graph['name'], self._compare_graph[c])
+        for c in self._other:
+            other = _conversion.from_pandas_df_id(self.related[c], f'{c}_id')
+            other = nx.intersection(name, other)
             other.remove_nodes_from(list(nx.isolates(other)))
             other = list(nx.connected_components(other))
             other = pd.DataFrame({'index': other})
@@ -84,8 +85,8 @@ class entity_resolver():
         
         # determine network by matching features
         self.network_feature = []
-        for c in self._compare_other:
-            other = self._compare_related[c].groupby(f'{c}_id')
+        for c in self._other:
+            other = self.related[c].groupby(f'{c}_id')
             other = other.agg({'index': set})
             other = other[other['index'].str.len()>1]
             other['category'] = c
@@ -139,7 +140,7 @@ class entity_resolver():
 
     def _assign_name(self, df_id, name_id, name_out):
 
-        common = self._compare_processed['name'].reset_index()
+        common = self._processed['name'].reset_index()
         common = common.drop(columns='column')
         common = df_id.merge(common, on='index')
         common = common.value_counts([name_id,'name']).reset_index()
