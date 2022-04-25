@@ -43,15 +43,15 @@ def prepare_values(df, category, columns):
     return values
 
 
-def find_related(category, values, analyzer, kneighbors, threshold):
+def find_related(category, values, kneighbors, threshold):
 
     # check kneighbors argument
     if not isinstance(kneighbors, int) or kneighbors<0:
-        raise ValueError(f'Argument kneighbors must be a positive integer.')
+        raise _exceptions.KneighborsRange(f'Argument kneighbors must be a positive integer.')
 
     # check threshold argument
     if threshold<=0 or threshold>1:
-        raise ValueError(f'Argument threshold must be >0 and <=1.')
+        raise _exceptions.ThresholdRange(f'Argument threshold must be >0 and <=1.')
 
     # identify exact matches
     related = values.groupby(values).ngroup()
@@ -70,7 +70,7 @@ def find_related(category, values, analyzer, kneighbors, threshold):
         # create TF-IDF matrix
         vectorizer = TfidfVectorizer(
             # create features using words or characters
-            analyzer=category_analyzer[analyzer],
+            analyzer=category_analyzer[category],
             # require 1 alphanumeric character instead of 2 to identify a word 
             token_pattern=r'(?u)\b\w+\b',
             # performed during preprocessing
