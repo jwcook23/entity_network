@@ -102,23 +102,23 @@ def test_email_domain():
 def test_address():
 
     values = pd.Series([
-        "123 North Name Road, FL 12345-6789",
+        "123 North RoadName Road, FL 12345-6789",
         "name@companyname.org",
         "",
-        "comapany 123 N E Name Road, FL. 12345-6789",
-        "123 apartment #4/5 North Name Road, FL 12345",
-        "123 North Name Road Apartment 3C, FL 12345-6789",
+        "comapany 123 N E RoadName Road, FL. 12345-6789",
+        "123 apartment #4/5 North RoadName Road, FL 12345",
+        "123 North roadName Road Apartment 3C, FL 12345-6789",
     ])
 
     prepared = clean_text.address(values)
 
     assert prepared.equals(
         pd.Series([
-            "123 n name rd fl 12345",
+            "123 n roadname rd fl 12345",
             pd.NA,
             pd.NA,
-            "123 ne name rd fl 12345",
-            "123 4 5 n name rd fl 12345",
-            "123 n name rd 3 c fl 12345",
+            "123 ne roadname rd fl 12345",
+            "123 4 5 n roadname rd fl 12345",
+            "123 n roadname rd 3 c fl 12345",
         ], dtype='string')
     )

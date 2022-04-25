@@ -165,7 +165,6 @@ def email_domain(values: Series, stopwords='default') ->Series:
         raise NotImplementedError('Multiple domains detected.')
     else:
         prepared = prepared[0]
-    prepared = _remove_stopwords(prepared, stopwords)
 
     # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
     prepared = _remove_stopwords(prepared, stopwords, 'email_domain')
