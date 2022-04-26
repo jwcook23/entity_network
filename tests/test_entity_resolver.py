@@ -7,8 +7,8 @@ from entity_network import entity_resolver, _exceptions
 def df():
 
     df = pd.DataFrame(columns=['CompanyName','PersonName','WorkPhone','HomePhone','CellPhone','Email','Address'])
-    df.loc[0] = ["Foo Bar's of   City", None, "1234567890", None, None, "name@companyname.org", "123 North Name Road, FL 12345-6789"]
-    df.loc[1] = ["Foo   Bar", None, "(1) 123-456-7890", "123-456-7890", "123-456-7890", "name@companyname.org", "123 North Name Road Apartment 3C, FL 12345-6789"]
+    df.loc[0] = ["Foo Bar's of   City", None, "1234567890", None, None, "name@companyname.org", "123 North RoadName Road, FL 12345-6789"]
+    df.loc[1] = ["Foo   Bar", None, "(1) 123-456-7890", "123-456-7890", "123-456-7890", "name@companyname.org", "123 North RoadName Road Apartment 3C, FL 12345-6789"]
     df.loc[2] = [None, "Foo Bar", None, "123-456-7890", "123-456-7890", "blahblah@companyname.org", None]
     df.loc[3] = [None, "John Smith", None, None, None, "john.smith@companyname.org", None]
     df.loc[4] = [None, "First Last", None, None, None, "blah_blah@companyname.org", None]
@@ -90,13 +90,19 @@ def test_network_similar(df):
     er = entity_resolver.entity_resolver(df)
     er.compare('email', columns=['Email'], kneighbors=10, threshold=0.8)
     er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=1)
+    er.compare('address', columns='Address', kneighbors=10, threshold=0.7)
 
     # compute entity
     df, entity_id, entity_feature = er.entity(columns=['CompanyName','PersonName'], kneighbors=10, threshold=0.6, analyzer='word')
     assert df.at[0,'entity_id']==0
     assert entity_id.at[0,'entity_id']==0
-    assert entity_feature.loc[0].equals(pd.DataFrame({'category': ['email','phone'], 'entity_id': [0,0]}, index=[0,0]))
+    assert entity_feature.loc[0].equals(pd.DataFrame({'category': ['email','phone','address'], 'entity_id': [0,0,0]}, index=[0,0,0]))
     # no match on similarity since non-exact matches become exact after preprocessing
     assert len(er.similar['email'])==0
-    # a similar name match
+    # similar name match
     assert er.similar['name'][['index','index_similar']].equals(pd.DataFrame({'index': [0,1], 'index_similar': [1,0]}))
+    # similar address match
+    assert er.similar['address'][['index','index_similar']].equals(pd.DataFrame({'index': [0,1], 'index_similar': [1,0]}))
+
+    # insure an original dataframe is returned
+    assert df[df_input.columns].equals(df_input)

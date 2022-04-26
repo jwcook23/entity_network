@@ -46,10 +46,8 @@ class entity_resolver():
         self.related[category] = related
         self.similar[category] = similar
 
-        return similar
 
-
-    def entity(self, columns, kneighbors, threshold, analyzer=None):
+    def entity(self, columns, kneighbors, threshold, analyzer='default'):
 
         self.compare('name', columns, kneighbors, threshold, analyzer)
 
