@@ -80,7 +80,7 @@ def create_network(df, n_samples=10):
     network = pd.concat([network, address], axis='index')
 
     # incorporate network into original dataframe
-    df = pd.concat([df, entity], axis='index', ignore_index=True)
+    df = pd.concat([df, network], axis='index', ignore_index=True)
 
     return df, network
 
@@ -92,8 +92,20 @@ from entity_network import entity_resolver
 
 # compare values
 er = entity_resolver.entity_resolver(df)
-er.compare('email', columns=['Email'], kneighbors=10, threshold=0.8)
-er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=1)
-er.compare('address', columns='Address', kneighbors=10, threshold=0.7)
+er.compare('email', columns=['Email'], kneighbors=10, threshold=0.90)
+er.compare('phone', columns=['HomePhone','WorkPhone','CellPhone'], kneighbors=10, threshold=0.90)
+er.compare('address', columns='Address', kneighbors=10, threshold=0.90)
 
-df, entity_id, entity_feature = er.entity(columns=['CompanyName','PersonName'], kneighbors=10, threshold=0.6, analyzer='word')
+df, entity_id, entity_feature = er.entity(columns=['PersonName'], kneighbors=10, threshold=0.90)
+
+
+def debug_entity(entity):
+
+    entity = 0
+
+    entity_id[entity_id['entity_id']==entity]
+
+    test = df[df['entity_id']==0]
+    entity_feature[entity_feature['entity_id']==0]
+
+    er.similar['name']

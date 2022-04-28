@@ -105,33 +105,47 @@ class entity_resolver():
 
     def _assign_id(self, connected, name_id):
 
-        # assign id to connected indices
-        assigned_id = _conversion.from_pandas_series(connected['index'])
-        assigned_id = pd.DataFrame({'index': list(nx.connected_components(assigned_id))})
-        assigned_id.index.name = name_id
-        assigned_id = assigned_id.explode('index').reset_index()
+        count_name = f'{name_id}_count'
+
+        if len(connected)==0:
+            assigned_id = pd.DataFrame(columns=['index',count_name, name_id])
+        else:
+            # determine connected components by forming graph
+            assigned_id = _conversion.from_pandas_series(connected['index'])
+            assigned_id = pd.DataFrame({'index': list(nx.connected_components(assigned_id))})
+
+            # assign count and sort descending so that higher counts have a lower entity_id
+            assigned_id[count_name] = assigned_id['index'].str.len()
+            assigned_id = assigned_id.sort_values(count_name, ascending=False)
+
+            # assign id to connected indices
+            assigned_id.index.name = name_id
+            assigned_id = assigned_id.explode('index').reset_index()
 
         # assign id to indices that aren't connected
         unassigned = self._df.index[~self._df.index.isin(assigned_id['index'])]
         unassigned = pd.DataFrame({'index': unassigned})
-        seed = assigned_id[name_id].max()+1
+        seed = pd.Series([assigned_id[name_id].max()+1, 0]).max().astype('int64')
         assigned_id = pd.concat([assigned_id, unassigned])
         unassigned = assigned_id[name_id].isna()
         assigned_id.loc[unassigned,name_id] = range(seed, seed+sum(unassigned))
         assigned_id[name_id] = assigned_id[name_id].astype('int64')
+        assigned_id[count_name] = assigned_id[count_name].fillna(1)
+        assigned_id[count_name] = assigned_id[count_name].astype('int64')
 
-        # sort by index of original dataframe
-        assigned_id = assigned_id.sort_values('index')
+        # sort by entity index count and index of original dataframe
+        assigned_id = assigned_id.sort_values([name_id, 'index'], ascending=True)
 
-        # expand nested input connected features and assign the id
-        connected = connected.explode('index')
-        connected = connected.merge(assigned_id, on='index')
+        if len(connected)>0:
+            # expand nested input connected features and assign the id
+            connected = connected.explode('index')
+            connected = connected.merge(assigned_id, on='index')
 
-        # sort by index of original dataframe
-        connected = connected.sort_values('index')
+            # sort by index of original dataframe
+            connected = connected.sort_values('index')
 
-        # set index of feature dataframe as original source index
-        connected = connected.set_index('index')
+            # set index of feature dataframe as original source index
+            connected = connected.set_index('index')
 
         return assigned_id, connected
 
@@ -146,9 +160,6 @@ class entity_resolver():
         common = common.drop_duplicates(subset=name_id)
         common = common.rename(columns={'name': name_out})
         df_id = df_id.merge(common, on=name_id)
-
-        # sort by index of original dataframe
-        df_id = df_id.sort_values('index')
 
         # set index of id dataframe as original source index
         df_id = df_id.set_index('index')

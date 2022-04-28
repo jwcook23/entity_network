@@ -1,4 +1,3 @@
-faker
 black
 flake8
 bandit
