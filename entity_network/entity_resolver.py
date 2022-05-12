@@ -27,7 +27,7 @@ class entity_resolver():
         self._processed = {}
 
 
-    def compare(self, category, columns, kneighbors, threshold, analyzer='default', preprocessor='default'):
+    def compare(self, category, columns, kneighbors:int=10, threshold:int=1, analyzer='default', preprocessor='default'):
 
         # track other categories compared beside name which form a network
         if category!='name':
@@ -49,59 +49,63 @@ class entity_resolver():
 
     def entity(self, columns, kneighbors, threshold, analyzer='default'):
 
-        self.compare('name', columns, kneighbors, threshold, analyzer)
+        raise NotImplemented('Only compare is currently implemented.')
 
-        # form graph of matching names
-        name = _conversion.from_pandas_df_id(self.related['name'], 'name_id')
+        # self.compare('name', columns, kneighbors, threshold, analyzer)
 
-        # compare name graph to graphs of other features to resolve entities
-        self.entity_feature = []
-        for c in self._other:
-            other = _conversion.from_pandas_df_id(self.related[c], f'{c}_id')
-            other = nx.intersection(name, other)
-            other.remove_nodes_from(list(nx.isolates(other)))
-            other = list(nx.connected_components(other))
-            other = pd.DataFrame({'index': other})
-            other['category'] = c
-            self.entity_feature.append(other)
-        self.entity_feature = pd.concat(self.entity_feature, ignore_index=True)
+        # # form graph of matching names
+        # name = _conversion.from_pandas_df_id(self.related['name'], 'name_id')
 
-        # assign entity_id to all records
-        self.entity_id, self.entity_feature = self._assign_id(self.entity_feature, 'entity_id')
+        # # compare name graph to graphs of other features to resolve entities
+        # self.entity_feature = []
+        # for c in self._other:
+        #     other = _conversion.from_pandas_df_id(self.related[c], f'{c}_id')
+        #     other = nx.intersection(name, other)
+        #     other.remove_nodes_from(list(nx.isolates(other)))
+        #     other = list(nx.connected_components(other))
+        #     other = pd.DataFrame({'index': other})
+        #     other['category'] = c
+        #     self.entity_feature.append(other)
+        # self.entity_feature = pd.concat(self.entity_feature, ignore_index=True)
 
-        # assign entity_name
-        self.entity_id = self._assign_name(self.entity_id, 'entity_id', 'entity_name')
+        # # assign entity_id to all records
+        # self.entity_id, self.entity_feature = self._assign_id(self.entity_feature, 'entity_id')
 
-        # assign entity_id to original dataframe
-        self._df = self._df.merge(self.entity_id[['entity_id']], left_index=True, right_index=True, how='left')
-        self._df['entity_id'] = self._df['entity_id'].astype('Int64')
+        # # assign entity_name
+        # self.entity_id = self._assign_name(self.entity_id, 'entity_id', 'entity_name')
 
-        return self._df, self.entity_id, self.entity_feature
+        # # assign entity_id to original dataframe
+        # self._df = self._df.merge(self.entity_id[['entity_id']], left_index=True, right_index=True, how='left')
+        # self._df['entity_id'] = self._df['entity_id'].astype('Int64')
+
+        # return self._df, self.entity_id, self.entity_feature
 
 
     def network(self):
         
-        # determine network by matching features
-        self.network_feature = []
-        for c in self._other:
-            other = self.related[c].groupby(f'{c}_id')
-            other = other.agg({'index': set})
-            other = other[other['index'].str.len()>1]
-            other['category'] = c
-            self.network_feature.append(other)
-        self.network_feature = pd.concat(self.network_feature)
+        raise NotImplemented('Only compare is currently implemented.')
 
-        # assign network_id to all records
-        self.network_id, self.network_feature = self._assign_id(self.network_feature, 'network_id')
+        # # determine network by matching features
+        # self.network_feature = []
+        # for c in self._other:
+        #     other = self.related[c].groupby(f'{c}_id')
+        #     other = other.agg({'index': set})
+        #     other = other[other['index'].str.len()>1]
+        #     other['category'] = c
+        #     self.network_feature.append(other)
+        # self.network_feature = pd.concat(self.network_feature)
 
-        # assign network name
-        self.network_id = self._assign_name(self.network_id, 'network_id', 'network_name')
+        # # assign network_id to all records
+        # self.network_id, self.network_feature = self._assign_id(self.network_feature, 'network_id')
 
-        # assign network_id to original dataframe
-        self._df = self._df.merge(self.network_id[['network_id']], left_index=True, right_index=True)
-        self._df['network_id'] = self._df['network_id'].astype('Int64')
+        # # assign network name
+        # self.network_id = self._assign_name(self.network_id, 'network_id', 'network_name')
 
-        return self._df, self.network_id, self.network_feature
+        # # assign network_id to original dataframe
+        # self._df = self._df.merge(self.network_id[['network_id']], left_index=True, right_index=True)
+        # self._df['network_id'] = self._df['network_id'].astype('Int64')
+
+        # return self._df, self.network_id, self.network_feature
 
     def _assign_id(self, connected, name_id):
 
