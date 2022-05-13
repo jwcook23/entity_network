@@ -1,8 +1,9 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
+from unicodedata import category
 import pandas as pd
 import networkx as nx
 
-from entity_network import _exceptions, _conversion, _core
+from entity_network import _exceptions, _core
 
 class entity_resolver():
 
@@ -15,23 +16,17 @@ class entity_resolver():
         if reserved.isin(df.columns).any():
             raise _exceptions.ReservedColumn(f'Argument df cannot contain the columns: {reserved[reserved.isin(df.columns)].to_list()}')
 
-        self.entity_feature = None
-        self.entity_id = None
+        self.network_relation = {}
+        self.similar_records = {}
         self.network_feature = None
         self.network_id = None
-        self.related = {}
-        self.similar = {}
-
+        # self.entity_feature = None
+        # self.entity_id = None
         self._df = df
-        self._other = []
         self._processed = {}
 
 
     def compare(self, category, columns, kneighbors:int=10, threshold:int=1, analyzer='default', preprocessor='default'):
-
-        # track other categories compared beside name which form a network
-        if category!='name':
-            self._other.append(category)
 
         # prepare values for comparison
         self._processed[category] = _core.prepare_values(self._df, category, columns, preprocessor)
@@ -43,8 +38,8 @@ class entity_resolver():
 
         # compare values on similarity threshold
         related, similar = _core.find_related(category, self._processed[category], kneighbors=kneighbors, threshold=threshold, analyzer=analyzer)
-        self.related[category] = related
-        self.similar[category] = similar
+        self.network_relation[category] = related
+        self.similar_records[category] = similar
 
 
     def entity(self, columns, kneighbors, threshold, analyzer='default'):
@@ -54,12 +49,12 @@ class entity_resolver():
         # self.compare('name', columns, kneighbors, threshold, analyzer)
 
         # # form graph of matching names
-        # name = _conversion.from_pandas_df_id(self.related['name'], 'name_id')
+        # name = _conversion.from_pandas_df_id(self.network_relation['name'], 'name_id')
 
         # # compare name graph to graphs of other features to resolve entities
         # self.entity_feature = []
         # for c in self._other:
-        #     other = _conversion.from_pandas_df_id(self.related[c], f'{c}_id')
+        #     other = _conversion.from_pandas_df_id(self.network_relation[c], f'{c}_id')
         #     other = nx.intersection(name, other)
         #     other.remove_nodes_from(list(nx.isolates(other)))
         #     other = list(nx.connected_components(other))
@@ -69,7 +64,7 @@ class entity_resolver():
         # self.entity_feature = pd.concat(self.entity_feature, ignore_index=True)
 
         # # assign entity_id to all records
-        # self.entity_id, self.entity_feature = self._assign_id(self.entity_feature, 'entity_id')
+        # self.entity_id, self.entity_feature = self._core.assign_id(self.entity_feature, 'entity_id')
 
         # # assign entity_name
         # self.entity_id = self._assign_name(self.entity_id, 'entity_id', 'entity_name')
@@ -82,90 +77,17 @@ class entity_resolver():
 
 
     def network(self):
-        
-        raise NotImplemented('Only compare is currently implemented.')
 
-        # # determine network by matching features
-        # self.network_feature = []
-        # for c in self._other:
-        #     other = self.related[c].groupby(f'{c}_id')
-        #     other = other.agg({'index': set})
-        #     other = other[other['index'].str.len()>1]
-        #     other['category'] = c
-        #     self.network_feature.append(other)
-        # self.network_feature = pd.concat(self.network_feature)
+        # determine network by matching features
+        self.network_feature = []
+        for category,related in self.network_relation.items():
+            other = related.groupby(f'{category}_id')
+            other = other.agg({'index': set})
+            other['category'] = category
+            self.network_feature.append(other)
+        self.network_feature = pd.concat(self.network_feature, ignore_index=True)
 
-        # # assign network_id to all records
-        # self.network_id, self.network_feature = self._assign_id(self.network_feature, 'network_id')
+        # assign network_id to connected records
+        self.network_id, self.network_feature = _core.assign_id(self.network_feature, 'network_id')
 
-        # # assign network name
-        # self.network_id = self._assign_name(self.network_id, 'network_id', 'network_name')
-
-        # # assign network_id to original dataframe
-        # self._df = self._df.merge(self.network_id[['network_id']], left_index=True, right_index=True)
-        # self._df['network_id'] = self._df['network_id'].astype('Int64')
-
-        # return self._df, self.network_id, self.network_feature
-
-    def _assign_id(self, connected, name_id):
-
-        count_name = f'{name_id}_count'
-
-        if len(connected)==0:
-            assigned_id = pd.DataFrame(columns=['index',count_name, name_id])
-        else:
-            # determine connected components by forming graph
-            assigned_id = _conversion.from_pandas_series(connected['index'])
-            assigned_id = pd.DataFrame({'index': list(nx.connected_components(assigned_id))})
-
-            # assign count and sort descending so that higher counts have a lower entity_id
-            assigned_id[count_name] = assigned_id['index'].str.len()
-            assigned_id = assigned_id.sort_values(count_name, ascending=False)
-
-            # assign id to connected indices
-            assigned_id.index.name = name_id
-            assigned_id = assigned_id.explode('index').reset_index()
-
-        # assign id to indices that aren't connected
-        unassigned = self._df.index[~self._df.index.isin(assigned_id['index'])]
-        unassigned = pd.DataFrame({'index': unassigned})
-        seed = pd.Series([assigned_id[name_id].max()+1, 0]).max().astype('int64')
-        assigned_id = pd.concat([assigned_id, unassigned])
-        unassigned = assigned_id[name_id].isna()
-        assigned_id.loc[unassigned,name_id] = range(seed, seed+sum(unassigned))
-        assigned_id[name_id] = assigned_id[name_id].astype('int64')
-        assigned_id[count_name] = assigned_id[count_name].fillna(1)
-        assigned_id[count_name] = assigned_id[count_name].astype('int64')
-
-        # sort by entity index count and index of original dataframe
-        assigned_id = assigned_id.sort_values([name_id, 'index'], ascending=True)
-
-        if len(connected)>0:
-            # expand nested input connected features and assign the id
-            connected = connected.explode('index')
-            connected = connected.merge(assigned_id, on='index')
-
-            # sort by index of original dataframe
-            connected = connected.sort_values('index')
-
-            # set index of feature dataframe as original source index
-            connected = connected.set_index('index')
-
-        return assigned_id, connected
-
-
-    def _assign_name(self, df_id, name_id, name_out):
-
-        common = self._processed['name'].reset_index()
-        common = common.drop(columns='column')
-        common = df_id.merge(common, on='index')
-        common = common.value_counts([name_id,'name']).reset_index()
-        common = common.drop(columns=0)
-        common = common.drop_duplicates(subset=name_id)
-        common = common.rename(columns={'name': name_out})
-        df_id = df_id.merge(common, on=name_id)
-
-        # set index of id dataframe as original source index
-        df_id = df_id.set_index('index')
-
-        return df_id
+        return self.network_id, self.network_feature, self.network_relation

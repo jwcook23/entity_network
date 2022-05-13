@@ -1,7 +1,3 @@
-class ReservedColumn(Exception):
-    '''Exception for dataframe containing a reserved column name.'''
-    pass
-
 class DuplicatedIndex(Exception):
     '''Exception for dataframe not having a unique index.'''
     pass
