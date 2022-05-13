@@ -76,3 +76,26 @@ def test_all_category():
         assert (result['index']==2).all()
         allowed = [[x,x] for x in columns]
         assert result['column'].apply(lambda x: x in allowed).all()
+
+
+def test_two_dfs():
+
+    n_unique = 1000
+    n_duplicates = 30
+
+    # generate sample data
+    df1 = sample.unique_records(n_unique)
+    df2, sample_id = sample.similar_df(df1, n_duplicates)
+
+    # compare and derive network
+    er = entity_resolver(df1, df2)
+    criteria = {
+        'phone': ['HomePhone','WorkPhone','CellPhone', 'Phone'],
+        'email': ['Email','EmailAddress'],
+        'address': ['Address','StreetAddress']
+    }
+    for category, columns in criteria.items():
+        er.compare(category, columns=columns)
+    network_id, network_feature, network_relation = er.network()
+
+    assert 1==1

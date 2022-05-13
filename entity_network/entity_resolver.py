@@ -8,13 +8,9 @@ from entity_network import _exceptions, _core
 class entity_resolver():
 
 
-    def __init__(self, df):
+    def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
 
-        if df.index.has_duplicates:
-            raise _exceptions.DuplicatedIndex('Argument df index must be unique.')
-        reserved = pd.Series(['entity_id','network_id'])
-        if reserved.isin(df.columns).any():
-            raise _exceptions.ReservedColumn(f'Argument df cannot contain the columns: {reserved[reserved.isin(df.columns)].to_list()}')
+        self._prepare_index(df, df2)          
 
         self.network_relation = {}
         self.similar_records = {}
@@ -22,7 +18,6 @@ class entity_resolver():
         self.network_id = None
         # self.entity_feature = None
         # self.entity_id = None
-        self._df = df
         self._processed = {}
 
 
@@ -90,4 +85,39 @@ class entity_resolver():
         # assign network_id to connected records
         self.network_id, self.network_feature = _core.assign_id(self.network_feature, 'network_id')
 
+        # translate index back to the original values
+        self._original_index()
+
         return self.network_id, self.network_feature, self.network_relation
+
+    def _prepare_index(self, df, df2):
+
+        if df.index.has_duplicates:
+            raise _exceptions.DuplicatedIndex('Argument df index must be unique.')
+        if df2 is not None and df2.index.has_duplicates:
+            raise _exceptions.DuplicatedIndex('Argument df2 index must be unique.')
+
+        # develop unique integer based index for each df in case they need to be combined
+        index_mask = {
+            'df': pd.Series(range(0, len(df)), index=df.index),
+            'df2': None
+        }
+        df.index = index_mask['df']
+        if df2 is not None:
+            # start df2 index at end of df index
+            seed = len(index_mask['df'])+1
+            index_mask['df2'] = pd.Series(range(seed, seed+len(df2)), index=df2.index)
+            df2.index = index_mask['df2']
+            # stack df2 on each of df for a single df to be compared
+            df = pd.concat([df, df2])
+
+        self._df = df
+        self._index_mask = index_mask
+
+    def _original_index(self):
+
+        # self.network_relation = {}
+        # self.similar_records = {}
+        # self.network_feature = None
+        # self.network_id = None
+        pass

@@ -40,26 +40,25 @@ def duplicate_records(df1, n_samples):
     return sample_df, sample_id
 
 
-def similar_df(df1):
-    '''Generate records for two dataframes where df2 shares values with df1.'''
+def similar_df(df1, n_duplicates):
+    '''Generate records for two dataframes where df2 shares values with df1 but is rearranged.'''
 
-    # df2 using values from df1 but rearranging and renaming columns
-    n_samples = 30
-    df2 = df1.sample(n_samples).copy()
-    df2 = df2.reset_index(drop=True)
+    # df2 using values from df1
+    df2 = df1.sample(n_duplicates).copy()
+    new_index = range(0, len(df2))
+    sample_id = pd.DataFrame({'index': list(zip(df2.index, new_index))})
+    sample_id['sample_id'] = range(0, len(sample_id))
+    sample_id = sample_id.explode('index')
+    df2.index = new_index
 
     # change name of the person to make a new entity
-    df2['PersonName'] = [fake.unique.name() for _ in range(n_samples)]
+    df2['PersonName'] = [fake.unique.name() for _ in range(n_duplicates)]
 
-    # rename columns for parameter specification when comparing
+    # rename columns to rearrange
     df2 = df2.rename(columns={'Email': 'EmailAddress', 'Address': 'StreetAddress'})
 
-    # develop single Phone column using values from HomePhone, WorkPhone, CellPhone
-    df2['Phone'] = pd.NA
-    df2.iloc[0:10, df2.columns=='Phone'] = df2.iloc[0:10, df2.columns=='HomePhone']
-    df2.iloc[10:20, df2.columns=='Phone'] = df2.iloc[10:20, df2.columns=='WorkPhone']
-    df2.iloc[20:30, df2.columns=='Phone'] = df2.iloc[20:30, df2.columns=='CellPhone']
+    # develop single Phone column using values from HomePhone
+    df2['Phone'] = df2['HomePhone']
     df2 = df2.drop(columns=['HomePhone','WorkPhone','CellPhone'])
 
-    # TODO: return network for test assertion
-    return df1, df2
+    return df2, sample_id
