@@ -76,7 +76,8 @@ class entity_resolver():
         # determine network by matching features
         self.network_feature = []
         for category,related in self.network_relation.items():
-            other = related.groupby(f'{category}_id')
+            other = related.reset_index()
+            other = other.groupby(f'{category}_id')
             other = other.agg({'index': set})
             other['category'] = category
             self.network_feature.append(other)
@@ -99,15 +100,16 @@ class entity_resolver():
 
         # develop unique integer based index for each df in case they need to be combined
         index_mask = {
-            'df': pd.Series(range(0, len(df)), index=df.index),
-            'df2': None
+            'df': pd.Series(df.index, index=range(0, len(df)))
         }
-        df.index = index_mask['df']
+        index_mask['df'].name = 'index'
+        df.index = index_mask['df'].index
         if df2 is not None:
             # start df2 index at end of df index
             seed = len(index_mask['df'])+1
-            index_mask['df2'] = pd.Series(range(seed, seed+len(df2)), index=df2.index)
-            df2.index = index_mask['df2']
+            index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
+            index_mask['df2'].name = 'index'
+            df2.index = index_mask['df2'].index
             # stack df2 on each of df for a single df to be compared
             df = pd.concat([df, df2])
 
@@ -116,8 +118,22 @@ class entity_resolver():
 
     def _original_index(self):
 
-        # self.network_relation = {}
-        # self.similar_records = {}
-        # self.network_feature = None
-        # self.network_id = None
-        pass
+        # TODO: split self.similar_records
+        for category, combined in self.network_relation.items():
+            self.network_relation[category] = self._split_df(combined)
+        self.network_feature = self._split_df(self.network_feature)
+        self.network_id = self._split_df(self.network_id)
+
+
+    def _split_df(self, combined):
+        '''Split dataframe into original dataframes and add the original index.'''
+        df = combined.merge(
+            self._index_mask['df'], left_index=True, right_index=True
+        )
+        df = df.set_index('index')
+        df2 = combined.merge(
+            self._index_mask['df2'], left_index=True, right_index=True
+        )
+        df2 = df2.set_index('index')
+
+        return {'df': df, 'df2': df2}

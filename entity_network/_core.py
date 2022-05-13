@@ -154,6 +154,10 @@ def find_related(category, values, kneighbors, threshold, analyzer):
     related.columns = related.columns.str.replace(r'^id', f'{category}_id', regex=True)
     similar.columns = similar.columns.str.replace(r'^id', f'{category}_id', regex=True)
 
+    # set index as the frames index
+    related = related.set_index('index')
+    similar = similar.set_index('index')
+
     return related, similar
 
 def assign_id(connected, name_id):
@@ -173,7 +177,9 @@ def assign_id(connected, name_id):
 
         # assign id to connected indices
         assigned_id.index.name = name_id
-        assigned_id = assigned_id.explode('index').reset_index()
+        assigned_id = assigned_id.explode('index')
+        assigned_id = assigned_id.reset_index()
+        assigned_id = assigned_id.set_index('index')
 
     # assign id to indices that aren't connected
     # unassigned = self._df.index[~self._df.index.isin(assigned_id['index'])]
@@ -192,18 +198,16 @@ def assign_id(connected, name_id):
     if len(connected)>0:
         # expand nested input connected features
         connected = connected.explode('index')
+        connected = connected.set_index('index')
 
         # keep only one value if record is connected by multiple features
         connected = connected.drop_duplicates()
 
         # assign the id
-        connected = connected.merge(assigned_id, on='index')
+        connected = connected.merge(assigned_id, left_index=True, right_index=True)
 
         # sort by index of original dataframe
-        connected = connected.sort_values('index')
-
-        # set index of feature dataframe as original source index
-        connected = connected.set_index('index')
+        connected = connected.sort_index()
 
     return assigned_id, connected
 
