@@ -1,5 +1,6 @@
 '''Generate fake records using Faker https://faker.readthedocs.io/en/master/'''
-
+import random
+from itertools import chain
 import pandas as pd
 from faker import Faker
 
@@ -23,21 +24,33 @@ def unique_records(n_samples):
 
     return sample_df
 
-def duplicate_records(df1, n_samples):
+def duplicate_records(df1, n_samples, columns):
 
-    # generate new df and keep track of old and new indices for assertions
-    df2 = df1.sample(n_samples).copy()
-    new_index = df1.index.max()+1
-    new_index = range(new_index, new_index+n_samples)
-    sample_id = pd.DataFrame({'index': list(zip(df2.index, new_index))})
-    sample_id['sample_id'] = range(0, len(sample_id))
-    sample_id = sample_id.explode('index')
-    df2.index = new_index
+    # generate sample indicies
+    index_df1 = random.sample(df1.index.tolist(), k=n_samples)
+    index_df2 = range(df1.index.max()+1, df1.index.max()+1+n_samples)
 
+    # generate new df
+    cols = list(chain(*columns.values()))
+    df2 = df1.loc[index_df1, cols].copy()
+    df2.index = index_df2
+
+    # assertion for matching index
+    sample_id = pd.Series(list(zip(index_df1, index_df2)))
+    sample_id.name = 'index'
+    sample_id.index.name = 'id'
+
+    # assertion for matching feature columns
+    feature = [(col,col) for col in list(chain(*columns.values()))]
+    sample_feature = pd.DataFrame({
+        'index': sample_id,
+        'column': [feature]*len(sample_id)
+    })
+
+    # generate the sample frame
     sample_df = pd.concat([df1, df2])
 
-    # TODO: return network for test assertion
-    return sample_df, sample_id
+    return sample_df, sample_id, sample_feature
 
 
 def similar_df(df1, n_duplicates):
@@ -46,9 +59,10 @@ def similar_df(df1, n_duplicates):
     # df2 using values from df1
     df2 = df1.sample(n_duplicates).copy()
     new_index = range(0, len(df2))
-    sample_id = pd.DataFrame({'index': list(zip(df2.index, new_index))})
-    sample_id['sample_id'] = range(0, len(sample_id))
-    sample_id = sample_id.explode('index')
+    sample_id = {
+        'df': pd.DataFrame({'index': df2.index, 'sample_id': range(0, len(df2))}),
+        'df2': pd.DataFrame({'index': new_index, 'sample_id': range(0, len(df2))})
+    }
     df2.index = new_index
 
     # change name of the person to make a new entity

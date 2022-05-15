@@ -78,8 +78,8 @@ class entity_resolver():
         for category,related in self.network_relation.items():
             other = related.reset_index()
             other = other.groupby(f'{category}_id')
-            other = other.agg({'index': set})
-            other['category'] = category
+            other = other.agg({'index': tuple, 'column': tuple})
+            # other = other.reset_index()
             self.network_feature.append(other)
         self.network_feature = pd.concat(self.network_feature, ignore_index=True)
 
@@ -100,7 +100,8 @@ class entity_resolver():
 
         # develop unique integer based index for each df in case they need to be combined
         index_mask = {
-            'df': pd.Series(df.index, index=range(0, len(df)))
+            'df': pd.Series(df.index, index=range(0, len(df))),
+            'df2': None
         }
         index_mask['df'].name = 'index'
         df.index = index_mask['df'].index
@@ -131,9 +132,13 @@ class entity_resolver():
             self._index_mask['df'], left_index=True, right_index=True
         )
         df = df.set_index('index')
-        df2 = combined.merge(
-            self._index_mask['df2'], left_index=True, right_index=True
-        )
-        df2 = df2.set_index('index')
+        if self._index_mask['df2'] is None:
+            result = df
+        else:
+            df2 = combined.merge(
+                self._index_mask['df2'], left_index=True, right_index=True
+            )
+            df2 = df2.set_index('index')
+            result = {'df': df, 'df2': df2}
 
-        return {'df': df, 'df2': df2}
+        return result

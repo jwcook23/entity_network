@@ -170,16 +170,31 @@ def assign_id(connected, name_id):
         # determine connected components by forming graph
         assigned_id = _conversion.from_pandas_series(connected['index'])
         assigned_id = pd.DataFrame({'index': list(nx.connected_components(assigned_id))})
-
-        # assign count and sort descending so that higher counts have a lower entity_id
-        # assigned_id[count_name] = assigned_id['index'].str.len()
-        # assigned_id = assigned_id.sort_values(count_name, ascending=False)
+        assigned_id.index.name = name_id
 
         # assign id to connected indices
-        assigned_id.index.name = name_id
+        connected.index.name = 'detail_id'
+        connected = connected.apply(pd.Series.explode)
+        connected = connected.reset_index()
         assigned_id = assigned_id.explode('index')
         assigned_id = assigned_id.reset_index()
-        assigned_id = assigned_id.set_index('index')
+        assigned_id = assigned_id.merge(connected, on='index')
+
+        # reconstruct match details
+        assigned_id = assigned_id.groupby('detail_id')
+        assigned_id = assigned_id.agg({
+            'network_id': 'first',
+            'index': tuple,
+            'column': tuple
+        })
+
+        # combine by network
+        assigned_id = assigned_id.groupby('network_id')
+        assigned_id = assigned_id.agg({
+            'index': list,
+            'column': list
+        })
+        
 
     # assign id to indices that aren't connected
     # unassigned = self._df.index[~self._df.index.isin(assigned_id['index'])]
@@ -195,19 +210,19 @@ def assign_id(connected, name_id):
     # sort by entity index count and index of original dataframe
     # assigned_id = assigned_id.sort_values([name_id, 'index'], ascending=True)
 
-    if len(connected)>0:
-        # expand nested input connected features
-        connected = connected.explode('index')
-        connected = connected.set_index('index')
+    # if len(connected)>0:
+    #     # expand nested input connected features
+    #     connected = connected.explode('index')
+    #     connected = connected.set_index('index')
 
-        # keep only one value if record is connected by multiple features
-        connected = connected.drop_duplicates()
+    #     # keep only one value if record is connected by multiple features
+    #     connected = connected.drop_duplicates()
 
-        # assign the id
-        connected = connected.merge(assigned_id, left_index=True, right_index=True)
+    #     # assign the id
+    #     connected = connected.merge(assigned_id, left_index=True, right_index=True)
 
-        # sort by index of original dataframe
-        connected = connected.sort_index()
+    #     # sort by index of original dataframe
+    #     connected = connected.sort_index()
 
     return assigned_id, connected
 

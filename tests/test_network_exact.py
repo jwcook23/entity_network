@@ -9,25 +9,25 @@ def test_single_category():
 
     # generate sample data
     sample_df = sample.unique_records(n_unique)
-    sample_df, sample_id = sample.duplicate_records(sample_df, n_duplicates)
+    columns = {'phone': ['HomePhone','WorkPhone','CellPhone']}
+    sample_df, sample_id, sample_feature = sample.duplicate_records(sample_df, n_duplicates, columns)
 
     # compare and derive network
     er = entity_resolver(sample_df)
-    columns = ['HomePhone','WorkPhone','CellPhone']
-    er.compare('phone', columns=columns)
-    network_id, network_feature, network_relation = er.network()
+    er.compare('phone', columns=columns['phone'])
+    network_id, network_feature = er.network()
 
-    # assert duplicate pairs exist
+    # check expected network pairs exist
     result = network_id.merge(sample_id, on='index')
     result = result.groupby(['network_id','sample_id']).size()
     assert len(result)==n_duplicates
     assert (result==2).all()
 
-    # assert how duplicate pairs are related
+    # network pairs all match on phone
     assert (sample_id['index'].sort_values()==network_feature.index).all()
     assert (network_feature['category']=='phone').all()
 
-    # assert details on how duplicate pairs are related
+    # network pairs all match directly on phone the same phone column
     result = network_relation['phone'].merge(sample_id, on='index')
     result = result.groupby(['phone_id','sample_id'])
     result = result.agg({'column': list, 'index': 'count'})
@@ -57,7 +57,7 @@ def test_all_category():
         er.compare(category, columns=columns)
     network_id, network_feature, network_relation = er.network()
 
-    # assert duplicate pairs exist
+    # check expected network pairs exist
     result = network_id.merge(sample_id, on='index')
     result = result.groupby(['network_id','sample_id']).size()
     assert len(result)==n_duplicates
@@ -65,10 +65,10 @@ def test_all_category():
 
     for category, columns in criteria.items():
 
-        # assert how duplicate pairs are related
+        # network pairs match on each category
         assert (sample_id['index'].sort_values()==network_feature[network_feature['category']==category].index).all()
 
-        # assert details on how duplicate pairs are related
+        # network paris match directy on each category
         result = network_relation[category].merge(sample_id, on='index')
         result = result.groupby([f'{category}_id','sample_id'])
         result = result.agg({'column': list, 'index': 'count'})
@@ -97,5 +97,12 @@ def test_two_dfs():
     for category, columns in criteria.items():
         er.compare(category, columns=columns)
     network_id, network_feature, network_relation = er.network()
+
+    # check expected network pairs exist
+    result_df = sample_id['df'].merge(network_id['df'], on='index')
+    result_df2 = sample_id['df2'].merge(network_id['df2'], on='index')
+    result = result_df.merge(result_df2, on='sample_id', suffixes=('_df','_df2'))
+    assert (result['network_id_df']==result['network_id_df2']).all()
+    assert len(result)==n_duplicates
 
     assert 1==1
