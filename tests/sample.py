@@ -58,15 +58,21 @@ def similar_df(df1, n_duplicates):
 
     # df2 using values from df1
     df2 = df1.sample(n_duplicates).copy()
+    
+    # produce duplicate rows in a single dataframe
+    df2 = pd.concat([df2, df2])
+
+    # assign
     new_index = range(0, len(df2))
-    sample_id = {
-        'df': pd.DataFrame({'index': df2.index, 'sample_id': range(0, len(df2))}),
-        'df2': pd.DataFrame({'index': new_index, 'sample_id': range(0, len(df2))})
-    }
+    sample_id = None
+    # sample_id = {
+    #     'df': pd.DataFrame({'index': df2.index, 'sample_id': range(0, len(df2))}),
+    #     'df2': pd.DataFrame({'index': new_index, 'sample_id': range(0, len(df2))})
+    # }
     df2.index = new_index
 
     # change name of the person to make a new entity
-    df2['PersonName'] = [fake.unique.name() for _ in range(n_duplicates)]
+    df2['PersonName'] = [fake.unique.name() for _ in range(len(df2))]
 
     # rename columns to rearrange
     df2 = df2.rename(columns={'Email': 'EmailAddress', 'Address': 'StreetAddress'})

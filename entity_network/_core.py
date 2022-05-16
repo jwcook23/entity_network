@@ -20,6 +20,49 @@ default_analyzer = {
     'address': 'word'
 }
 
+def prepare_index(df, df2):
+
+    if df.index.has_duplicates:
+        raise _exceptions.DuplicatedIndex('Argument df index must be unique.')
+    if df2 is not None and df2.index.has_duplicates:
+        raise _exceptions.DuplicatedIndex('Argument df2 index must be unique.')
+
+    # develop unique integer based index for each df in case they need to be combined
+    index_mask = {
+        'df': pd.Series(df.index, index=range(0, len(df))),
+        'df2': None
+    }
+    index_mask['df'].name = 'df_index'
+    df.index = index_mask['df'].index
+    if df2 is not None:
+        # start df2 index at end of df index
+        seed = len(index_mask['df'])+1
+        index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
+        index_mask['df2'].name = 'df2_index'
+        df2.index = index_mask['df2'].index
+        # stack df2 on each of df for a single df to be compared
+        df = pd.concat([df, df2])
+
+    return df, index_mask
+
+def original_index():
+    pass
+    '''Split dataframe into original dataframes and add the original index.'''
+    # df = combined.merge(
+    #     self._index_mask['df'], left_index=True, right_index=True
+    # )
+    # df = df.set_index('index')
+    # if self._index_mask['df2'] is None:
+    #     result = df
+    # else:
+    #     df2 = combined.merge(
+    #         self._index_mask['df2'], left_index=True, right_index=True
+    #     )
+    #     df2 = df2.set_index('index')
+    #     result = {'df': df, 'df2': df2}
+
+    # return result
+
 def prepare_values(df, category, columns, preprocessor):
 
     # check allowed category argument
@@ -44,7 +87,6 @@ def prepare_values(df, category, columns, preprocessor):
         values = preprocessor(values)
 
     return values
-
 
 def find_related(category, values, kneighbors, threshold, analyzer):
 
@@ -160,71 +202,41 @@ def find_related(category, values, kneighbors, threshold, analyzer):
 
     return related, similar
 
-def assign_id(connected, name_id):
+def _df_index(indices):
 
-    # count_name = f'{name_id}_count'
+    indices = indices.dropna()
+    indices = set(indices)
 
-    if len(connected)==0:
-        assigned_id = pd.DataFrame(columns=['index', name_id])
+    return indices
+
+
+def assign_id(indices, name_id, index_mask):
+
+    if len(indices)==0:
+        assigned = pd.DataFrame(columns=['index', 'column'])
+        assigned.index.name = name_id
     else:
-        # determine connected components by forming graph
-        assigned_id = _conversion.from_pandas_series(connected['index'])
-        assigned_id = pd.DataFrame({'index': list(nx.connected_components(assigned_id))})
-        assigned_id.index.name = name_id
 
-        # assign id to connected indices
-        connected.index.name = 'detail_id'
-        connected = connected.apply(pd.Series.explode)
+        # find any connected components and assign an id
+        connected = _conversion.from_pandas_series(indices['index'])
+        connected = pd.DataFrame({'index': list(nx.connected_components(connected))})
+        connected.index.name = name_id
+        connected = connected.explode('index')
         connected = connected.reset_index()
-        assigned_id = assigned_id.explode('index')
-        assigned_id = assigned_id.reset_index()
-        assigned_id = assigned_id.merge(connected, on='index')
 
-        # reconstruct match details
-        assigned_id = assigned_id.groupby('detail_id')
-        assigned_id = assigned_id.agg({
-            'network_id': 'first',
-            'index': tuple,
-            'column': tuple
-        })
+        # add id to input indices and details
+        indices = indices.apply(pd.Series.explode)
+        indices = indices.merge(connected, on='index')
 
-        # combine by network
-        assigned_id = assigned_id.groupby('network_id')
-        assigned_id = assigned_id.agg({
-            'index': list,
-            'column': list
-        })
+        # determine original index
+        indices = indices.merge(index_mask['df'], left_on='index', right_index=True, how='left')
+        indices = indices.merge(index_mask['df2'], left_on='index', right_index=True, how='left')
+        indices[['df_index','df2_index']] = indices[['df_index','df2_index']].astype('Int64')
+
+        # 
         
 
-    # assign id to indices that aren't connected
-    # unassigned = self._df.index[~self._df.index.isin(assigned_id['index'])]
-    # unassigned = pd.DataFrame({'index': unassigned})
-    # seed = pd.Series([assigned_id[name_id].max()+1, 0]).max().astype('int64')
-    # assigned_id = pd.concat([assigned_id, unassigned])
-    # unassigned = assigned_id[name_id].isna()
-    # assigned_id.loc[unassigned,name_id] = range(seed, seed+sum(unassigned))
-    # assigned_id[name_id] = assigned_id[name_id].astype('int64')
-    # assigned_id[count_name] = assigned_id[count_name].fillna(1)
-    # assigned_id[count_name] = assigned_id[count_name].astype('int64')
-
-    # sort by entity index count and index of original dataframe
-    # assigned_id = assigned_id.sort_values([name_id, 'index'], ascending=True)
-
-    # if len(connected)>0:
-    #     # expand nested input connected features
-    #     connected = connected.explode('index')
-    #     connected = connected.set_index('index')
-
-    #     # keep only one value if record is connected by multiple features
-    #     connected = connected.drop_duplicates()
-
-    #     # assign the id
-    #     connected = connected.merge(assigned_id, left_index=True, right_index=True)
-
-    #     # sort by index of original dataframe
-    #     connected = connected.sort_index()
-
-    return assigned_id, connected
+    return assigned
 
 
 # def _assign_name(self, df_id, name_id, name_out):
