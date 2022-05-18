@@ -82,9 +82,11 @@ class entity_resolver():
         network_feature = pd.concat(network_feature, ignore_index=True)
         network_feature.index.name = 'feature_id'
 
+        # create network graph
+        self.network_graph = _conversion.from_pandas_df(network_feature)
+
         # assign network_id to connected records
-        network_id = _conversion.from_pandas_series(network_feature['index'])
-        network_id = pd.DataFrame({'index': list(nx.connected_components(network_id))})
+        network_id = pd.DataFrame({'index': list(nx.connected_components(self.network_graph))})
         network_id['network_id'] = range(0, len(network_id))
         network_id = network_id.explode('index')
 
