@@ -17,25 +17,17 @@ def test_single_category():
     er.compare('phone', columns=columns['phone'])
     network_id, network_feature = er.network()
 
-    # check expected network pairs exist
-    result = network_id.merge(sample_id, on='index')
-    result = result.groupby(['network_id','sample_id']).size()
-    assert len(result)==n_duplicates
-    assert (result==2).all()
+    # check expected network relationships exist
+    relation = network_id.merge(sample_id, on='df_index')
+    relation = relation.groupby(['network_id','sample_id']).size()
+    assert len(relation)==n_duplicates
+    assert (relation==2).all()
 
-    # network pairs all match on phone
-    assert (sample_id['index'].sort_values()==network_feature.index).all()
-    assert (network_feature['category']=='phone').all()
-
-    # network pairs all match directly on phone the same phone column
-    result = network_relation['phone'].merge(sample_id, on='index')
-    result = result.groupby(['phone_id','sample_id'])
-    result = result.agg({'column': list, 'index': 'count'})
-    assert len(result)==n_duplicates*3
-    assert (result['index']==2).all()
-    allowed = [[x,x] for x in columns]
-    assert result['column'].apply(lambda x: x in allowed).all()
-
+    # check relationship matching features
+    feature = network_feature.merge(sample_feature, on=['df_index', 'column'])
+    feature = feature.groupby(['feature_id','sample_id']).size()
+    assert len(feature)==n_duplicates*len(columns['phone'])
+    assert (feature==2).all()
 
 def test_all_category():
 

@@ -100,7 +100,7 @@ class entity_resolver():
         # add original index to network_feature
         network_feature = network_feature.apply(pd.Series.explode)
         network_feature = network_feature.reset_index()
-        network_feature = network_feature.merge(network_id, on='index')
+        network_feature = network_feature.merge(network_id[network_id.columns.drop('network_id')], on='index')
 
         # remove artificially created index column
         network_id = network_id.drop(columns=['index'])
