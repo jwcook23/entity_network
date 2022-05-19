@@ -70,7 +70,7 @@ class entity_resolver():
 
         # return self._df, self.entity_id, self.entity_feature
 
-    def network(self):
+    def network(self, additional_details: list = []):
 
         # determine network by matching features
         network_feature = []
@@ -83,7 +83,7 @@ class entity_resolver():
         network_feature.index.name = 'feature_id'
 
         # create network graph
-        self.network_graph = _conversion.from_pandas_df(network_feature)
+        self.network_graph = _conversion.from_pandas_series(network_feature['index'])
 
         # assign network_id to connected records
         network_id = pd.DataFrame({'index': list(nx.connected_components(self.network_graph))})
@@ -105,8 +105,20 @@ class entity_resolver():
         network_feature = network_feature.merge(network_id[network_id.columns.drop('network_id')], on='index')
 
         # remove artificially created index column
-        network_id = network_id.drop(columns=['index'])
-        network_feature = network_feature.drop(columns=['index'])
+        # network_id = network_id.drop(columns=['index'])
+        # network_feature = network_feature.drop(columns=['index'])
+        network_id = network_id.set_index('index')
+        network_id.index.name = None
+        network_feature = network_feature.set_index('index')
+        network_feature.index.name = None
 
+        # add node details
+        for index in self.network_graph.nodes:
+            feature = self._df.loc[index, network_feature.loc[index, 'column']].to_dict()
+            self.network_graph.nodes[index].update(feature)
+        for col in additional_details:
+            for index in self.network_graph.nodes:
+                name = {col: self._df.at[index, col]}
+                self.network_graph.nodes[index].update(name)
 
         return network_id, network_feature

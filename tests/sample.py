@@ -8,15 +8,15 @@ from faker import Faker
 fake = Faker(locale='en_US')
 
 
-def unique_records(n_samples):
+def unique_records(n_unique):
 
     sample_df = pd.DataFrame({
-        'PersonName': [fake.unique.name() for _ in range(n_samples)],
-        'Email': [fake.unique.free_email() for _ in range(n_samples)],
-        'HomePhone': [fake.unique.phone_number() for _ in range(n_samples)],
-        'WorkPhone': [fake.unique.phone_number() for _ in range(n_samples)],
-        'CellPhone': [fake.unique.phone_number() for _ in range(n_samples)],
-        'Address': [fake.unique.address() for _ in range(n_samples)]
+        'PersonName': [fake.unique.name() for _ in range(n_unique)],
+        'Email': [fake.unique.free_email() for _ in range(n_unique)],
+        'HomePhone': [fake.unique.phone_number() for _ in range(n_unique)],
+        'WorkPhone': [fake.unique.phone_number() for _ in range(n_unique)],
+        'CellPhone': [fake.unique.phone_number() for _ in range(n_unique)],
+        'Address': [fake.unique.address() for _ in range(n_unique)]
     })
     for col in sample_df.columns:
         if sample_df[col].duplicated().any():
@@ -24,16 +24,17 @@ def unique_records(n_samples):
 
     return sample_df
 
-def duplicate_records(df1, n_samples, columns):
+def duplicate_records(df1, n_duplicates, columns):
 
     # generate sample indicies
-    index_df1 = random.sample(df1.index.tolist(), k=n_samples)
-    index_df2 = range(df1.index.max()+1, df1.index.max()+1+n_samples)
+    index_df1 = random.sample(df1.index.tolist(), k=n_duplicates)
+    index_df2 = range(df1.index.max()+1, df1.index.max()+1+n_duplicates)
 
     # generate new df
     cols = list(chain(*columns.values()))
     df2 = df1.loc[index_df1, cols].copy()
     df2.index = index_df2
+    df2['PersonName'] = [fake.unique.name() for _ in range(n_duplicates)]
 
     # assertion for matching index
     sample_id = pd.DataFrame({'df_index': list(zip(index_df1, index_df2))})
