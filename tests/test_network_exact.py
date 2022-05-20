@@ -31,6 +31,7 @@ def test_single_category():
     assert len(feature)==n_duplicates*len(columns['phone'])
     assert (feature==2).all()
 
+
 def test_all_category():
 
     n_unique = 1000
@@ -38,16 +39,16 @@ def test_all_category():
 
     # generate sample data
     sample_df = sample.unique_records(n_unique)
-    columns = {
+    columns_compare = {
         'phone': ['HomePhone','WorkPhone','CellPhone'],
         'email': ['Email'],
         'address': ['Address']
     }
-    sample_df, sample_id, sample_feature = sample.duplicate_records(sample_df, n_duplicates, columns)
+    sample_df, sample_id, sample_feature = sample.duplicate_records(sample_df, n_duplicates, columns_compare)
 
     # compare and derive network
     er = entity_resolver(sample_df)
-    for category, cols in columns.items():
+    for category, cols in columns_compare.items():
         er.compare(category, columns=cols)
     network_id, network_feature = er.network()
 
@@ -60,35 +61,35 @@ def test_all_category():
     # check relationship matching features
     feature = network_feature.merge(sample_feature, on=['df_index', 'column'])
     feature = feature.groupby(['feature_id','sample_id']).size()
-    assert len(feature)==n_duplicates*len(list(chain(*columns.values())))
+    assert len(feature)==n_duplicates*len(list(chain(*columns_compare.values())))
     assert (feature==2).all()
 
 
-# def test_two_dfs():
+def test_two_dfs():
 
-#     n_unique = 1000
-#     n_duplicates = 30
+    n_unique = 1000
+    n_duplicates = 30
 
-#     # generate sample data
-#     df1 = sample.unique_records(n_unique)
-#     df2, sample_id = sample.similar_df(df1, n_duplicates)
+    # generate sample data
+    df1 = sample.unique_records(n_unique)
+    df2, sample_id, sample_feature, columns_compare, columns_match = sample.similar_df(df1, n_duplicates)
 
-#     # compare and derive network
-#     er = entity_resolver(df1, df2)
-#     criteria = {
-#         'phone': ['HomePhone','WorkPhone','CellPhone', 'Phone'],
-#         'email': ['Email','EmailAddress'],
-#         'address': ['Address','StreetAddress']
-#     }
-#     for category, columns in criteria.items():
-#         er.compare(category, columns=columns)
-#     network_id, network_feature, network_relation = er.network()
+    # compare and derive network
+    er = entity_resolver(df1, df2)
+    for category, cols in columns_compare.items():
+        er.compare(category, columns=cols)
+    network_id, network_feature = er.network()
 
-#     # check expected network pairs exist
-#     result_df = sample_id['df'].merge(network_id['df'], on='index')
-#     result_df2 = sample_id['df2'].merge(network_id['df2'], on='index')
-#     result = result_df.merge(result_df2, on='sample_id', suffixes=('_df','_df2'))
-#     assert (result['network_id_df']==result['network_id_df2']).all()
-#     assert len(result)==n_duplicates
+    # check expected network pairs exist
+    for index, match in columns_match.items():
+        relation = network_id.merge(sample_id[[index,'sample_id']].dropna(), on=index)
+        relation = relation.groupby(['network_id','sample_id']).size()
+        assert len(relation)==n_duplicates
+        assert (relation==match['size']).all()
 
-#     assert 1==1
+    # check relationship matching features
+    for index, match in columns_match.items():
+        feature = network_feature.merge(sample_feature[[index,'sample_id','column']].dropna(), on=[index, 'column'])
+        feature = feature.groupby(['feature_id','sample_id']).size()
+        assert len(feature)==n_duplicates*len(match['columns'])
+        assert (feature==match['size']).all()
