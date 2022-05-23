@@ -114,7 +114,7 @@ class entity_resolver():
 
         # add node details
         for index in self.network_graph.nodes:
-            feature = self._df.loc[index, network_feature.loc[index, 'column']].to_dict()
+            feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
             self.network_graph.nodes[index].update(feature)
         for col in additional_details:
             for index in self.network_graph.nodes:

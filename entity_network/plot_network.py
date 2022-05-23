@@ -9,7 +9,7 @@ from bokeh.plotting import figure, from_networkx, show, output_file
 # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
 
 
-def plot_network(graph):
+def plot_network(graph, file_name):
 
     plot = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
         x_axis_location=None, y_axis_location=None,
@@ -29,6 +29,6 @@ def plot_network(graph):
     #                                             line_alpha=0.8, line_width=1.5)
     plot.renderers.append(graph_renderer)
 
-    output_file('NetworkGraph.html')
+    output_file(file_name+'.html')
 
     show(plot)

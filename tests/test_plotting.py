@@ -18,4 +18,4 @@ def test_single_category():
     er.compare('phone', columns=columns['phone'])
     network_id, network_feature = er.network()
 
-    plot_network(er.network_graph)
+    plot_network(er.network_graph, file_name='test_single_category')
