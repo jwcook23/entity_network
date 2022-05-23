@@ -1,8 +1,10 @@
 from itertools import chain
 
-import sample
+import pandas as pd
 
 from entity_network.entity_resolver import entity_resolver
+
+import sample
 
 def test_single_category():
 
@@ -93,3 +95,21 @@ def test_two_dfs():
         feature = feature.groupby(['feature_id','sample_id']).size()
         assert len(feature)==n_duplicates*len(match['columns'])
         assert (feature==match['size']).all()
+
+
+def test_record_self():
+
+    sample_df = pd.DataFrame({
+        'Name': ['NameA', 'NameB','NameC'],
+        'PhoneA': ['123456789', '123456789', '1112223333'],
+        'PhoneB': ['123456789', '123456789', '1112223333']
+    })
+
+    # compare and derive network
+    er = entity_resolver(sample_df)
+    er.compare('phone', columns=['PhoneA', 'PhoneB'])
+    network_id, network_feature = er.network()
+
+    # NameC should not self match
+    assert 2 not in network_id['df_index']
+    assert 2 not in network_feature['df_index']

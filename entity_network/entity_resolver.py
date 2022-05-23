@@ -75,10 +75,22 @@ class entity_resolver():
         # determine network by matching features
         network_feature = []
         for category,related in self.relationship.items():
+
+            category_id = f'{category}_id'
             feature = related.reset_index()
-            feature = feature.groupby(f'{category}_id')
+
+            # aggreate values to form network
+            feature = feature.groupby(category_id)
             feature = feature.agg({'index': tuple, 'column': tuple})
+
+            # remove records that only match the same record
+            feature = feature.loc[
+                feature['index'].apply(lambda x: len(set(x))>1)
+            ]
+
+            # append details for category
             network_feature.append(feature)
+        # dataframe of all matching features
         network_feature = pd.concat(network_feature, ignore_index=True)
         network_feature.index.name = 'feature_id'
 
