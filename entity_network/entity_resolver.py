@@ -70,7 +70,7 @@ class entity_resolver():
 
         # return self._df, self.entity_id, self.entity_feature
 
-    def network(self, additional_details: list = []):
+    def network(self):
 
         # determine network by matching features
         network_feature = []
@@ -112,13 +112,14 @@ class entity_resolver():
         network_feature = network_feature.set_index('index')
         network_feature.index.name = None
 
+        # TODO: add callback during plotting if needed
         # add node details
-        for index in self.network_graph.nodes:
-            feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
-            self.network_graph.nodes[index].update(feature)
-        for col in additional_details:
-            for index in self.network_graph.nodes:
-                name = {col: self._df.at[index, col]}
-                self.network_graph.nodes[index].update(name)
+        # for index in self.network_graph.nodes:
+        #     feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
+        #     self.network_graph.nodes[index].update(feature)
+        # for col in additional_details:
+        #     for index in self.network_graph.nodes:
+        #         name = {col: self._df.at[index, col]}
+        #         self.network_graph.nodes[index].update(name)
 
         return network_id, network_feature
