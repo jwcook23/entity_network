@@ -33,12 +33,14 @@ def prepare_index(df, df2):
         'df2': None
     }
     index_mask['df'].name = 'df_index'
+    df = df.copy()
     df.index = index_mask['df'].index
     if df2 is not None:
         # start df2 index at end of df index
         seed = len(index_mask['df'])+1
         index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
         index_mask['df2'].name = 'df2_index'
+        df2 = df2.copy()
         df2.index = index_mask['df2'].index
         # stack df2 on each of df for a single df to be compared
         df = pd.concat([df, df2])
