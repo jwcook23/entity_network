@@ -101,7 +101,7 @@ def find_related(category, values, kneighbors, threshold, analyzer):
         raise _exceptions.ThresholdRange(f'Argument threshold must be >0 and <=1.')
 
     # identify exact matches
-    related = values[values.duplicated(keep=False)]
+    related = values[values.duplicated(keep=False) & values.notna()]
     related = related.groupby(related)
     related = related.ngroup()
     related = related.reset_index()
