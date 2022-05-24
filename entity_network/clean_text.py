@@ -1,8 +1,6 @@
 '''Text cleaning functions for different categories of data.'''
 
-from email.policy import default
-from tracemalloc import stop
-from pandas import DataFrame, Series, NA
+from pandas import Series, NA
 from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
 
 default_stopwords = {
@@ -11,7 +9,8 @@ default_stopwords = {
         # words containing only one repeating digit
         r'^(\d)\1+$'
     ],
-    'email': ['no_reply','noreply','noreply@noreply.com'],
+    # TODO: remove email domains from email comparison
+    'email': ['noreply@noreply.com'],
     'email_domain': [
         # common domains
         '.com','.net','.org',
