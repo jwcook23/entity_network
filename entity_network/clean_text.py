@@ -11,7 +11,7 @@ default_stopwords = {
         # words containing only one repeating digit
         r'^(\d)\1+$'
     ],
-    'email': ['no_reply'],
+    'email': ['no_reply','noreply'],
     'email_domain': [
         # common domains
         '.com','.net','.org',
