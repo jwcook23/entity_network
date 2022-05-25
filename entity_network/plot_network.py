@@ -11,6 +11,16 @@ from bokeh.plotting import figure, from_networkx, show, output_file
 
 def plot_network(graph, file_name):
 
+    # TODO: add callback during plotting if needed
+    # add node details
+    # for index in self.network_graph.nodes:
+    #     feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
+    #     self.network_graph.nodes[index].update(feature)
+    # for col in additional_details:
+    #     for index in self.network_graph.nodes:
+    #         name = {col: self._df.at[index, col]}
+    #         self.network_graph.nodes[index].update(name)
+
     plot = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
         x_axis_location=None, y_axis_location=None,
         title="Graph Interaction Demo", background_fill_color="#efefef",

@@ -47,23 +47,29 @@ def prepare_index(df, df2):
 
     return df, index_mask
 
-def original_index():
-    pass
-    '''Split dataframe into original dataframes and add the original index.'''
-    # df = combined.merge(
-    #     self._index_mask['df'], left_index=True, right_index=True
-    # )
-    # df = df.set_index('index')
-    # if self._index_mask['df2'] is None:
-    #     result = df
-    # else:
-    #     df2 = combined.merge(
-    #         self._index_mask['df2'], left_index=True, right_index=True
-    #     )
-    #     df2 = df2.set_index('index')
-    #     result = {'df': df, 'df2': df2}
 
-    # return result
+def original_id_index(index_mask, df_id, df_feature):
+
+    # add original index in id dataframe
+    df_id = df_id.merge(index_mask['df'], left_on='index', right_index=True, how='left')
+    df_id['df_index'] = df_id['df_index'].astype('Int64')
+    if index_mask['df2'] is not None:
+        df_id = df_id.merge(index_mask['df2'], left_on='index', right_index=True, how='left')
+        df_id['df2_index'] = df_id['df2_index'].astype('Int64')
+
+    # add original index in feature dataframe
+    df_feature = df_feature.apply(pd.Series.explode)
+    df_feature = df_feature.reset_index()
+    df_feature = df_feature.merge(df_id, on='index')
+
+    # remove artifical create index
+    df_id = df_id.set_index('index')
+    df_id.index.name = None
+    df_feature = df_feature.set_index('index')
+    df_feature.index.name = None
+
+    return df_id, df_feature
+
 
 def prepare_values(df, category, columns, preprocessor):
 
@@ -89,6 +95,7 @@ def prepare_values(df, category, columns, preprocessor):
         values = preprocessor(values)
 
     return values
+
 
 def find_related(category, values, kneighbors, threshold, analyzer):
 
@@ -204,41 +211,40 @@ def find_related(category, values, kneighbors, threshold, analyzer):
 
     return related, similar
 
-def _df_index(indices):
 
-    indices = indices.dropna()
-    indices = set(indices)
+def common_features(relationship):
 
-    return indices
+    df_feature = []
+    for category,related in relationship.items():
+
+        category_id = f'{category}_id'
+        feature = related.reset_index()
+
+        # aggreate values to form network
+        feature = feature.groupby(category_id)
+        feature = feature.agg({'index': tuple, 'column': tuple})
+
+        # remove records that only match the same record
+        feature = feature.loc[
+            feature['index'].apply(lambda x: len(set(x))>1)
+        ]
+
+        # append details for category
+        df_feature.append(feature)
+    # dataframe of all matching features
+    df_feature = pd.concat(df_feature, ignore_index=True)
+    df_feature.index.name = 'feature_id'
+
+    return df_feature
 
 
-def assign_id(indices, name_id, index_mask):
+def assign_id(graph, id_name):
 
-    if len(indices)==0:
-        assigned = pd.DataFrame(columns=['index', 'column'])
-        assigned.index.name = name_id
-    else:
+    df_id = pd.DataFrame({'index': list(nx.connected_components(graph))})
+    df_id[id_name] = range(0, len(df_id))
+    df_id = df_id.explode('index')
 
-        # find any connected components and assign an id
-        connected = _conversion.from_pandas_series(indices['index'])
-        connected = pd.DataFrame({'index': list(nx.connected_components(connected))})
-        connected.index.name = name_id
-        connected = connected.explode('index')
-        connected = connected.reset_index()
-
-        # add id to input indices and details
-        indices = indices.apply(pd.Series.explode)
-        indices = indices.merge(connected, on='index')
-
-        # determine original index
-        indices = indices.merge(index_mask['df'], left_on='index', right_index=True, how='left')
-        indices = indices.merge(index_mask['df2'], left_on='index', right_index=True, how='left')
-        indices[['df_index','df2_index']] = indices[['df_index','df2_index']].astype('Int64')
-
-        # 
-        
-
-    return assigned
+    return df_id
 
 
 # def _assign_name(self, df_id, name_id, name_out):
