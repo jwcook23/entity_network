@@ -24,6 +24,7 @@ def unique_records(n_unique):
 
     return sample_df
 
+
 def duplicate_records(df1, n_duplicates, columns):
 
     # generate sample indicies
@@ -58,6 +59,19 @@ def duplicate_records(df1, n_duplicates, columns):
 
     return sample_df, sample_id, sample_feature
 
+def address_components(n_unique):
+
+    sample_df = pd.DataFrame({
+        'Street': [fake.unique.street_address() for _ in range(n_unique)],
+        'City': [fake.unique.city() for _ in range(n_unique)],
+        'State': [fake.unique.state() for _ in range(n_unique)],
+        'Zip': [fake.unique.postcode() for _ in range(n_unique)],
+    })
+    for col in sample_df.columns:
+        if sample_df[col].duplicated().any():
+            raise RuntimeError(f'Column {col} contains duplicate values.')
+
+    return sample_df
 
 def similar_df(df1, n_duplicates):
     '''Generate records for two dataframes where df2 shares values with df1 but is rearranged. df2 contains

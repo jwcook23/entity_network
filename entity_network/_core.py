@@ -77,9 +77,19 @@ def prepare_values(df, category, columns, preprocessor):
     if not category in default_preprocessor:
         raise _exceptions.InvalidCategory(f'Argument catgeory must be one of: {default_preprocessor}')
 
-    # check and prepare column argument
+    # prepare column argument
     if isinstance(columns, str):
         columns = [columns]
+    split_cols = [idx for idx,cols in enumerate(columns) if isinstance(cols, list)]
+    if len(split_cols)>0:
+        for idx in split_cols:
+            # join dataframe values
+            combined = ','.join(columns[idx])
+            df[combined] = df[columns[idx]].fillna('').agg(' '.join, axis=1)
+            # adjust columns argument
+            columns[idx] = combined
+
+    # check presence of columns
     columns = pd.Series(columns)
     missing = columns[~columns.isin(df)]
     if any(missing):

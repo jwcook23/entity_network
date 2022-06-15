@@ -3,6 +3,8 @@
 from pandas import Series, NA
 from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
 
+# TODO: investigate cleantext https://pypi.org/project/clean-text/
+
 default_stopwords = {
     'name': list(ENGLISH_STOP_WORDS),
     'phone': [
@@ -115,6 +117,8 @@ def phone(values: Series, stopwords='default') -> Series:
     prepared (Series) : values after processing
     '''
 
+    # TODO: allow stripping leading digit
+
     prepared = _common_presteps(values)
 
     # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
@@ -199,6 +203,7 @@ def address(values: Series, stopwords='default') -> Series:
     prepared = _remove_stopwords(prepared, stopwords, 'address')
 
     # remove ZIP+4 since commonly isn't given
+    # TODO: allow option to include or ignore zip+4
     prepared = prepared.replace(to_replace=r'-\d+$', value='', regex=True)
 
     # keep only letters and numbers
