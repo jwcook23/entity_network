@@ -20,7 +20,7 @@ def test_InvalidCategory():
     with pytest.raises(_exceptions.InvalidCategory):
         df = pd.DataFrame({'ColumnA': ['a','b']}, index=[1,2])
         er = entity_resolver(df)
-        er.compare('foo', 'ColumnB', kneighbors=10, threshold=1)
+        er.compare('foo', 'ColumnA', kneighbors=10, threshold=1)
 
 def test_ThresholdRange():
     with pytest.raises(_exceptions.ThresholdRange):
