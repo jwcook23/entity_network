@@ -51,7 +51,7 @@ def test_all_category():
     # compare and derive network
     er = entity_resolver(sample_df)
     for category, cols in columns_compare.items():
-        er.compare(category, columns=cols)
+        er.compare(category, columns=cols, text_cleaner=None)
     network_id, network_feature = er.network()
 
      # check expected network relationships exist

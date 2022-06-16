@@ -38,9 +38,9 @@ def flatten(df, columns):
 
 def clean(values, category, text_cleaner):
 
-    # check allowed category argument
-    if not category in default_text_cleaner:
-        raise _exceptions.InvalidCategory(f'Argument catgeory must be one of: {default_text_cleaner}')
+    # check allowed category argument for default cleaner
+    if category not in default_text_cleaner:
+        raise _exceptions.InvalidCategory(f"Argument catgeory must be one of {list(default_text_cleaner.keys())} when text_cleaner=='default'.")
 
     # preprocess values by category type
     if text_cleaner=='default':

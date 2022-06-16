@@ -33,12 +33,15 @@ class entity_resolver():
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'flatten', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # clean column text
-        print(f'cleaning {category}')
-        tstart = time()
-        self.processed[category] = _prepare.clean(self.processed[category], category, text_cleaner)
+        if text_cleaner is not None:
+            print(f'cleaning {category}')
+            tstart = time()
+            self.processed[category] = _prepare.clean(self.processed[category], category, text_cleaner)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+
+        # set sources for tracability when comparing multiple categories
         self.processed[category].index.names = ('index', 'column')
         self.processed[category].name = category
-        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # ignore values the processor completely removed
         # self.processed[category] = self.processed[category].dropna()
