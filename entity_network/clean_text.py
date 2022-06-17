@@ -1,5 +1,4 @@
 '''Text cleaning functions for different categories of data.'''
-
 from pandas import Series, NA
 from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
 

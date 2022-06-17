@@ -1,6 +1,11 @@
+from time import time
+
 import pandas as pd
+from faker import Faker
+
 from entity_network import clean_text
 
+fake = Faker(locale='en_US')
 
 def test_possible_stopwords():
 
@@ -122,3 +127,14 @@ def test_address():
             "123 n roadname rd 3 c fl 12345",
         ], dtype='string')
     )
+
+def test_address_speed():
+
+    values = [fake.address() for _ in range(1000)]*100
+    values = pd.Series(values)
+
+    tstart = time()
+    _ = clean_text.address(values)
+    duration = time()-tstart
+
+    assert duration<5
