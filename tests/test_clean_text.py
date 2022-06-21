@@ -128,6 +128,7 @@ def test_address():
         ], dtype='string')
     )
 
+
 def test_address_speed():
 
     values = [fake.address() for _ in range(1000)]*100

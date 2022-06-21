@@ -24,6 +24,9 @@ def flatten(df, columns):
             # adjust columns argument
             columns[idx] = combined
 
+    # handle columns from two dataframes with the same column name
+    columns = list(set(columns))
+
     # check presence of columns
     columns = pd.Series(columns)
     missing = columns[~columns.isin(df)]

@@ -24,7 +24,7 @@ class entity_resolver():
         self.timer = pd.DataFrame(columns=['caller','file','method','category','time_seconds'])
 
 
-    def compare(self, category, columns, kneighbors:int=10, threshold:int=1, text_comparer='default', text_cleaner='default'):
+    def compare(self, category, columns, kneighbors:int=10, threshold:float=1, text_comparer='default', text_cleaner='default'):
 
         # combine split columns, flatten into single
         print(f'flattening {columns}')

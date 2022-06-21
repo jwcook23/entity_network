@@ -213,7 +213,7 @@ def address(values: Series, stopwords='default') -> Series:
 
     # use common address abbreviations instead of full word
     pattern = {
-        'avenue':'ave', 'terrace':'ter', 'court':'ct', 'street':'st',
+        'avenue':'ave', 'terrace':'ter', 'terr': 'ter', 'court':'ct', 'street':'st',
         'place':'pl', 'lane':'ln', 'suite':'ste', 'building':'bldg', 'saint':'st',
         'apartment':'apt', 'fort':'ft', 'highway':'hwy', 'parkway':'pkwy', 'road':'rd',
         'north':'n', 'south':'s', 'east':'e', 'west':'w',

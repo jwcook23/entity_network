@@ -34,7 +34,7 @@ def unique(df, df2):
     df.index = index_mask['df'].index
     if df2 is not None:
         # start df2 index at end of df index
-        seed = len(index_mask['df'])+1
+        seed = len(index_mask['df'])
         index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
         index_mask['df2'].name = 'df2_index'
         df2 = df2.copy()

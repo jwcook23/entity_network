@@ -67,12 +67,12 @@ def match(category, values, kneighbors, threshold, text_comparer):
         index.createIndex()
 
         # find nearest neighbors for the TF-IDF matrix
-        similar = index.knnQueryBatch(tfidf, k=kneighbors, num_threads=4)
-        similar = pd.DataFrame(similar, columns=['other_index','score'], index=tfidf_index.index)
-        similar.index.name = 'tfidf_index'
-        similar = similar.apply(pd.Series.explode)
-        similar = similar.reset_index()
-        similar['score'] = similar['score']*-1
+        similar_score = index.knnQueryBatch(tfidf, k=kneighbors, num_threads=4)
+        similar_score = pd.DataFrame(similar_score, columns=['other_index','score'], index=tfidf_index.index)
+        similar_score.index.name = 'tfidf_index'
+        similar_score = similar_score.apply(pd.Series.explode)
+        similar_score = similar_score.reset_index()
+        similar_score['score'] = similar_score['score']*-1
 
         # check kneighbors and threshold comination potentially excluding matches
         # TODO: issue warning or raise exception if possible
@@ -81,40 +81,39 @@ def match(category, values, kneighbors, threshold, text_comparer):
         #     raise _exceptions.KneighborsThreshold(f'Similar matches excluded with kneighbors={kneighbors} and threshold={threshold}')
 
         # ignore matches to the same value
-        similar = similar[similar['tfidf_index']!=similar['other_index']]
-
-        # apply threshold
-        similar = similar[similar['score']>=threshold]     
-
-        # assign id to similarly connected components
-        connected = nx.from_pandas_edgelist(similar, source='tfidf_index', target='other_index')
-        connected = pd.DataFrame({'tfidf_index': list(nx.connected_components(connected))})
-        connected.index.name = 'id_similar'
-        connected = connected.explode('tfidf_index').reset_index()
-        similar = similar.merge(connected, left_on='tfidf_index', right_on='tfidf_index')
+        similar_score = similar_score[similar_score['tfidf_index']!=similar_score['other_index']]   
 
         # replace tfidf_index with original unique data index
-        similar = similar.merge(tfidf_index, left_on='tfidf_index', right_index=True)
-        similar = similar.merge(tfidf_index, left_on='other_index', right_index=True, suffixes=('','_similar'))
-        similar = similar.drop(columns=['tfidf_index','other_index'])
+        similar_score = similar_score.merge(tfidf_index, left_on='tfidf_index', right_index=True)
+        similar_score = similar_score.merge(tfidf_index, left_on='other_index', right_index=True, suffixes=('','_similar'))
+        similar_score = similar_score.drop(columns=['tfidf_index','other_index'])
 
-        # develop overall id by assuming the same id_exact for each group of id_similar (id_exact used is most frequent overall)
-        related = related.merge(similar[['index','column','id_similar']], on=['index','column'], how='left')
-        related['id_similar'] = related['id_similar'].astype('Int64')
-        frequent = related['id_exact'].value_counts().to_frame(name='count')
-        frequent.index.name = 'id_exact'
-        frequent = frequent.reset_index()
-        frequent = frequent.merge(related[['id_exact','id_similar']], on='id_exact')
-        frequent = frequent.sort_values('count', ascending=False)
-        frequent = frequent[['id_exact','id_similar']]
-        frequent = frequent.dropna(subset='id_similar')
-        frequent = frequent.drop_duplicates('id_similar', keep='first')
-        frequent = frequent.rename(columns={'id_exact': 'id'})
-        related = related.merge(frequent, on='id_similar', how='left')
-        related['id'] = related['id'].fillna(related['id_exact'])
+        # apply threshold
+        similar = similar_score[similar['score']>=threshold] 
+
+        # assign id to similarly connected components
+        connected = nx.from_pandas_edgelist(similar, source='index', target='index_similar')
+        connected = pd.DataFrame({'index': list(nx.connected_components(connected))})
+        connected.index.name = 'id_similar'
+        connected = connected.explode('index').reset_index()
+        similar = similar.merge(connected, left_on='index', right_on='index') 
+
+        # add similar into exact matches
+        related = pd.concat([related, similar[['index','column','id_similar']]], ignore_index=True)
+        related[['id_exact','id_similar']] = related[['id_exact','id_similar']].astype('Int64')
+
+        # develop an overall id
+        related['temp_id'] = related.groupby(['id_exact','id_similar'], dropna=False).ngroup()
+        combine = related.groupby('index')
+        combine = combine.agg({'temp_id': list})
+        combine['id'] = combine['temp_id'].apply(lambda x: x[0])
+        combine = combine.explode('temp_id')
+        combine = combine.drop_duplicates(keep='first', subset='temp_id')
+        related = related.merge(combine, on='temp_id')
+        related = related.drop(columns='temp_id')
 
     # format return datatypes the same for exact or similar
-    related = related.astype({'index': 'int64', 'column': 'string', 'id_exact': 'int64', 'id_similar': 'Int64', 'id': 'int64'})
+    related = related.astype({'index': 'int64', 'column': 'string', 'id_exact': 'Int64', 'id_similar': 'Int64', 'id': 'int64'})
     similar = similar.astype({'score': 'float64', 'id_similar': 'int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'string'})
 
     # add caregory description to ids for traceability
