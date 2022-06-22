@@ -49,7 +49,10 @@ def test_similar_address():
     actual = actual.apply(pd.Series.explode)
     missing = df1.index[~df1.index.isin(actual['df_index'])]
     assert len(missing)==0
-    # df.loc[missing]
+    # er.similar['address'][er.similar['address']['df_index']==1]
+    # df1.loc[1]
+    # df2.loc[1]
+    # er.processed['address'][(er.processed['address']['df_index']==1) | (er.processed['address']['df2_index']==1)]
     assert len(actual)==len(df2)
 
 def test_combine_similar_exact():

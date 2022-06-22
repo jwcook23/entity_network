@@ -50,9 +50,11 @@ class entity_resolver():
         print(f'comparing {columns}')
         tstart = time()
         self.related[category], self.similar[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
-        
-        # self.similar_records[category] = similar
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+
+        # add original index to processed values
+        self.processed[category] = self.processed[category].reset_index()
+        self.processed[category] = _index.original(self.processed[category], self._index_mask)
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)

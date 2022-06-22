@@ -88,16 +88,19 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         similar = similar.merge(tfidf_index, left_on='other_index', right_index=True, suffixes=('','_similar'))
         similar = similar.drop(columns=['tfidf_index','other_index'])
 
-        # apply threshold
-        # similar = similar[similar['score']>=threshold]
+        # apply threshold criteria
         similar['threshold'] = similar['score']>=threshold
+
+        # place most similar values first for first dataframe
+        similar = similar.sort_values(by=['index', 'score'], ascending=[True, False])
 
         # assign id to similarly connected components
         connected = nx.from_pandas_edgelist(similar[similar['threshold']], source='index', target='index_similar')
         connected = pd.DataFrame({'index': list(nx.connected_components(connected))})
         connected.index.name = 'id_similar'
         connected = connected.explode('index').reset_index()
-        similar = similar.merge(connected, left_on='index', right_on='index', how='left')
+        connected['threshold'] = True
+        similar = similar.merge(connected, on=['index','threshold'], how='left')
         similar['id_similar'] = similar['id_similar'].astype('Int64')
 
         # add similar into exact matches
