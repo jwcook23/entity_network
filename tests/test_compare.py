@@ -76,9 +76,12 @@ def test_combine_similar_exact():
         'column': ['AddressA']*5,
         'address_id_exact': [0,0,0,pd.NA, pd.NA],
         'address_id_similar': [pd.NA, pd.NA, pd.NA, 0, 0],
-        'address_id': [0]*5
+        'address_id': [0]*5,
+        'df_index': [0, 1, pd.NA, 0, pd.NA],
+        'df2_index': [pd.NA, pd.NA, 1, pd.NA, 0]
     }, index=pd.Index([0,1,3,0,2], name='index'))
     expected['column'] = expected['column'].astype('string')
-    expected[['address_id_exact','address_id_similar']] = expected[['address_id_exact','address_id_similar']].astype('Int64')
+    cols = ['address_id_exact','address_id_similar','df_index','df2_index']
+    expected[cols] = expected[cols].astype('Int64')
 
     assert er.related['address'].equals(expected)

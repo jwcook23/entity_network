@@ -3,7 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import nmslib
 import networkx as nx
 
-from entity_network import _exceptions
+from entity_network import _index, _exceptions
 
 default_text_comparer = {
     'name': 'char',
@@ -13,7 +13,7 @@ default_text_comparer = {
     'address': 'word'
 }
 
-def match(category, values, kneighbors, threshold, text_comparer):
+def match(category, values, kneighbors, threshold, text_comparer, index_mask):
 
     # check kneighbors argument
     if not isinstance(kneighbors, int) or kneighbors<0:
@@ -115,10 +115,14 @@ def match(category, values, kneighbors, threshold, text_comparer):
         related = related.drop(columns='temp_id')
 
     # format final return and add traceability
+    # TODO: change data types earlier
+    related = _index.original(related, index_mask)
     related = related.astype({'index': 'int64', 'column': 'string', 'id_exact': 'Int64', 'id_similar': 'Int64', 'id': 'int64'})
     related.columns = related.columns.str.replace(r'^id', f'{category}_id', regex=True)
     related = related.set_index('index')
     if similar is not None:
+        similar = _index.original(similar, index_mask)
+        similar = _index.original(similar, index_mask, index_name='index_similar')
         similar = similar.astype({'score': 'float64', 'id_similar': 'Int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'string'})
         similar.columns = similar.columns.str.replace(r'^id', f'{category}_id', regex=True)
         similar = similar.set_index('index')

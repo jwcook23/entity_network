@@ -49,7 +49,7 @@ class entity_resolver():
         # compare values on similarity threshold
         print(f'comparing {columns}')
         tstart = time()
-        self.related[category], self.similar[category] = _compare.match(category, self.processed[category], kneighbors=kneighbors, threshold=threshold, text_comparer=text_comparer)
+        self.related[category], self.similar[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
         
         # self.similar_records[category] = similar
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
@@ -79,7 +79,7 @@ class entity_resolver():
 
         # add original index
         tstart = time()
-        network_id, network_feature = _index.original(self._index_mask, network_id, network_feature)
+        network_id, network_feature = _index.related(network_id, network_feature, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'original', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # sort by most time intensive

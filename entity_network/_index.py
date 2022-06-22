@@ -45,14 +45,32 @@ def unique(df, df2):
     return df, index_mask
 
 
-def original(index_mask, df_id, df_feature):
+def original(reindexed, index_mask, index_name = 'index'):
+
+    mask = index_mask['df'].copy()
+    if index_name=='index_similar':
+        mask.name = f'{mask.name}_similar'
+    reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
+    reindexed[mask.name] = reindexed[mask.name].astype('Int64')
+    if index_mask['df2'] is not None:
+        mask = index_mask['df2'].copy()
+        if index_name=='index_similar':
+            mask.name = f'{mask.name}_similar'        
+        reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
+        reindexed[mask.name] = reindexed[mask.name].astype('Int64')
+
+    return reindexed
+
+
+def related(df_id, df_feature, index_mask):
 
     # add original index in id dataframe
-    df_id = df_id.merge(index_mask['df'], left_on='index', right_index=True, how='left')
-    df_id['df_index'] = df_id['df_index'].astype('Int64')
-    if index_mask['df2'] is not None:
-        df_id = df_id.merge(index_mask['df2'], left_on='index', right_index=True, how='left')
-        df_id['df2_index'] = df_id['df2_index'].astype('Int64')
+    # df_id = df_id.merge(index_mask['df'], left_on='index', right_index=True, how='left')
+    # df_id['df_index'] = df_id['df_index'].astype('Int64')
+    # if index_mask['df2'] is not None:
+    #     df_id = df_id.merge(index_mask['df2'], left_on='index', right_index=True, how='left')
+    #     df_id['df2_index'] = df_id['df2_index'].astype('Int64')
+    df_id = original(df_id, index_mask)
 
     # add original index in feature dataframe
     df_feature = df_feature.apply(pd.Series.explode)
