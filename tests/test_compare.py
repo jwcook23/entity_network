@@ -19,11 +19,11 @@ def test_split_column():
     er = entity_resolver(df1, df2)
     er.compare('address', columns=[['Street', 'City', 'State', 'Zip'], 'Address'])
     
-    assert all(er.relationship['address'].index == [0, 11])
-    assert all(er.relationship['address']['column'] == ['Street,City,State,Zip', 'Address'])
-    assert all(er.relationship['address']['address_id_exact'] == [0,0])
-    assert all(er.relationship['address']['address_id_similar'].isna())
-    assert all(er.relationship['address']['address_id'] == [0,0])
+    assert all(er.related['address'].index == [0, 10])
+    assert all(er.related['address']['column'] == ['Street,City,State,Zip', 'Address'])
+    assert all(er.related['address']['address_id_exact'] == [0,0])
+    assert all(er.related['address']['address_id_similar'].isna())
+    assert all(er.related['address']['address_id'] == [0,0])
 
 def test_similar_address():
 
@@ -81,4 +81,4 @@ def test_combine_similar_exact():
     expected['column'] = expected['column'].astype('string')
     expected[['address_id_exact','address_id_similar']] = expected[['address_id_exact','address_id_similar']].astype('Int64')
 
-    assert er.relationship['address'].equals(expected)
+    assert er.related['address'].equals(expected)

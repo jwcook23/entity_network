@@ -14,8 +14,8 @@ class entity_resolver():
 
         self._df, self._index_mask = _index.unique(df, df2)
 
-        self.relationship = {}
-        # self.similar_records = {}
+        self.related = {}
+        self.similar = {}
         # self.network_feature = None
         # self.network_id = None
         # self.entity_feature = None
@@ -49,8 +49,8 @@ class entity_resolver():
         # compare values on similarity threshold
         print(f'comparing {columns}')
         tstart = time()
-        related, similar = _compare.match(category, self.processed[category], kneighbors=kneighbors, threshold=threshold, text_comparer=text_comparer)
-        self.relationship[category] = related
+        self.related[category], self.similar[category] = _compare.match(category, self.processed[category], kneighbors=kneighbors, threshold=threshold, text_comparer=text_comparer)
+        
         # self.similar_records[category] = similar
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
@@ -112,7 +112,7 @@ class entity_resolver():
     def __common_features(self):
 
         df_feature = []
-        for category,related in self.relationship.items():
+        for category,related in self.related.items():
 
             category_id = f'{category}_id'
             feature = related.reset_index()
