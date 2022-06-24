@@ -1,6 +1,6 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from time import time
-from itertools import combinations
+from itertools import combinations, product
 
 import pandas as pd
 import networkx as nx
@@ -89,6 +89,111 @@ class entity_resolver():
 
         return network_id, network_feature
 
+
+    def index_comparison(self, category, index_df: list = None, index_df2: list = None):
+
+        # define columns based on number of initialized dataframes
+        if self._index_mask['df2'] is None:
+            cols_processed = ['df_index', category]
+            cols_score = ['df_index', 'df_index_similar', 'score']
+            cols_exact = ['df_index']
+        else:
+            cols_processed = ['df_index','df2_index',category]
+            cols_score = ['df_index', 'df_index_similar', 'df2_index','df2_index_similar', 'score']
+            cols_exact = ['df_index', 'df2_index']
+
+        # select processed text and similarity score for category
+        processed = self.processed[category][cols_processed]
+        score = self.similar[category][cols_score]
+
+        # include exact matches
+        id_exact = f'{category}_id_exact'
+        exact = self.related[category][cols_exact+[id_exact]]
+        if exact[id_exact].notna().any():
+            list_notna = lambda l: [x for x in l if pd.notna(x)]
+            list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],)] if len(x)>0 else [tuple()])
+            # find combinations for exact match groups
+            exact = exact.groupby(id_exact)
+            exact = exact.agg({col: list_notna for col in cols_exact})
+
+            exact['df_index'] = exact['df_index'].apply(list_combo)
+            exact = exact.explode('df_index')
+            if self._index_mask['df2'] is not None:
+                exact['df2_index'] = exact['df2_index'].apply(list_combo)
+                exact = exact.explode('df2_index')
+
+
+            exact['df_index','df_index_similar'] = pd.DataFrame(exact['df_index'].to_list(), columns=['df_index','df_index_similar'])
+
+
+            if self._index_mask['df2'] is not None:
+                exact = exact.apply(lambda x: list(product(x[0], x[1])), axis='columns')
+                exact = exact.explode()
+                exact = pd.DataFrame(exact.to_list(), columns=['df_index','df2_index'])
+            score = pd.concat([score, exact])
+            score['score'] = score['score'].fillna(1.0)
+
+
+        # error check index inputs
+        if index_df is None and index_df2 is None:
+            raise RuntimeError('One of index_df or index_df2 must be provided.')
+        elif index_df is not None and index_df2 is not None:
+            raise RuntimeError('Only one of index_df or index_df2 can be provided.')
+        elif index_df is not None:
+            check = pd.Series(index_df)
+            missing = ~check.isin(processed['df_index'])
+            if any(missing):
+                raise RuntimeError(f'index_df provided is not a valid index: {list(check[missing])}')
+        elif index_df2 is not None:
+            check = pd.Series(index_df2)
+            missing = ~check.isin(processed['df2_index'])
+            if any(missing):
+                raise RuntimeError(f'index_df2 provided is not a valid index: {list(check[missing])}')
+
+        # select indices by parameters given
+        if index_df2 is None:
+            comparison = processed.loc[processed['df_index'].isin(index_df), ['df_index', category]]
+            comparison = comparison.merge(score, on='df_index')
+            if self._index_mask['df2'] is not None:
+                related = comparison[['df_index',category,'df2_index']].dropna(subset='df2_index')
+                related = related.merge(score[['df2_index','df2_index_similar','score']], on='df2_index')
+                related = related.dropna(subset='df2_index_similar')
+                related = related.drop(columns=['df2_index'])
+                comparison = pd.concat([comparison, related])
+        else:
+            comparison = processed.loc[processed['df2_index'].isin(index_df2), ['df2_index', category]]
+            comparison = comparison.merge(score, on='df2_index')
+            # include similar values within the same dataframe
+            related = comparison[['df2_index',category,'df_index']].dropna(subset='df_index')
+            related = related.merge(score[['df_index','df_index_similar','score']], on='df_index')
+            related = related.dropna(subset='df_index_similar')
+            related = related.drop(columns=['df_index'])
+            comparison = pd.concat([comparison, related])
+        
+
+        # add similar values from first df
+        similar = processed[['df_index', category]]
+        similar = similar.dropna(subset='df_index')
+        similar = similar.rename(columns={'df_index': 'df_index_similar'})
+        comparison = comparison.merge(similar, on='df_index_similar', suffixes=('','_df_similar'), how='left')
+
+        # add similar values from second df
+        if self._index_mask['df2'] is not None:
+            similar = processed[['df2_index', category]]
+            similar = similar.dropna(subset='df2_index')
+            similar = similar.rename(columns={'df2_index': 'df2_index_similar'})
+            comparison = comparison.merge(similar, on='df2_index_similar', suffixes=('','_df2_similar'), how='left')
+
+        # sort by first appearing index
+        if index_df2 is not None:
+            comparison = comparison.sort_values('df2_index')
+        else:
+            comparison = comparison.sort_values('df_index')
+
+        # reset index that doesn't carry meaning for equality testing
+        comparison = comparison.reset_index(drop=True)
+
+        return comparison
 
     def __series_graph(self, edges):
         '''Convert Pandas series of lists to graph.'''

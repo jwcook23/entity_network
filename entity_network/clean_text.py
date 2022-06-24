@@ -216,6 +216,7 @@ def address(values: Series, stopwords='default') -> Series:
         'avenue':'ave', 'terrace':'ter', 'terr': 'ter', 'court':'ct', 'street':'st',
         'place':'pl', 'lane':'ln', 'suite':'ste', 'building':'bldg', 'saint':'st',
         'apartment':'apt', 'fort':'ft', 'highway':'hwy', 'parkway':'pkwy', 'road':'rd',
+        'beach': 'bch',
         'north':'n', 'south':'s', 'east':'e', 'west':'w',
         'northeast':'ne', 'northwest':'nw', 'southeast':'se', 'southwest':'sw'
     }
