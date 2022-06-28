@@ -92,15 +92,18 @@ class entity_resolver():
 
     def index_comparison(self, category, index_df: list = None, index_df2: list = None):
 
+        # check if class initialized with one or two dataframes
+        two_dfs = self._index_mask['df2'] is not None
+
         # define columns based on number of initialized dataframes
-        if self._index_mask['df2'] is None:
-            cols_processed = ['df_index', category]
-            cols_score = ['df_index', 'df_index_similar', 'score']
-            cols_exact = ['df_index']
-        else:
+        if two_dfs:
             cols_processed = ['df_index','df2_index',category]
             cols_score = ['df_index', 'df_index_similar', 'df2_index','df2_index_similar', 'score']
             cols_exact = ['df_index', 'df2_index']
+        else:
+            cols_processed = ['df_index', category]
+            cols_score = ['df_index', 'df_index_similar', 'score']
+            cols_exact = ['df_index']
 
         # select processed text and similarity score for category
         processed = self.processed[category][cols_processed]
@@ -111,27 +114,38 @@ class entity_resolver():
         exact = self.related[category][cols_exact+[id_exact]]
         if exact[id_exact].notna().any():
             list_notna = lambda l: [x for x in l if pd.notna(x)]
-            list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],)] if len(x)>0 else [tuple()])
+            list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],pd.NA)] if len(x)>0 else [(pd.NA, pd.NA)])
             # find combinations for exact match groups
             exact = exact.groupby(id_exact)
             exact = exact.agg({col: list_notna for col in cols_exact})
-
+            # expand first df combos
             exact['df_index'] = exact['df_index'].apply(list_combo)
             exact = exact.explode('df_index')
-            if self._index_mask['df2'] is not None:
+            exact[['df_index','df_index_similar']] = exact['df_index'].to_list()
+            exact[['df_index','df_index_similar']] = exact[['df_index','df_index_similar']].astype('Int64')
+            # expand second df combos
+            if two_dfs:
                 exact['df2_index'] = exact['df2_index'].apply(list_combo)
                 exact = exact.explode('df2_index')
-
-
-            exact['df_index','df_index_similar'] = pd.DataFrame(exact['df_index'].to_list(), columns=['df_index','df_index_similar'])
-
-
-            if self._index_mask['df2'] is not None:
-                exact = exact.apply(lambda x: list(product(x[0], x[1])), axis='columns')
-                exact = exact.explode()
-                exact = pd.DataFrame(exact.to_list(), columns=['df_index','df2_index'])
+                exact[['df2_index','df2_index_similar']] = exact['df2_index'].to_list()
+                exact[['df2_index','df2_index_similar']] = exact[['df2_index','df2_index_similar']].astype('Int64')
+            # add exact values
             score = pd.concat([score, exact])
             score['score'] = score['score'].fillna(1.0)
+            # include related similarity for exact matches between two dataframes
+            if two_dfs:
+                related = exact[['df_index','df2_index','df2_index_similar']]
+                related = related.rename(columns={'df_index': 'df_index_similar'})
+                related = related.merge(score.drop(columns=['df2_index','df2_index_similar']), on='df_index_similar')
+                related['df_index_similar'] = pd.NA
+                related['df_index_similar'] = related['df_index_similar'].astype('Int64')
+                score = pd.concat([score, related], ignore_index=True)
+
+                related = exact[['df_index','df_index_similar']]
+                related = related.merge(score[score['score']<1.0].drop(columns='df_index_similar'), on='df_index')
+                related['df_index'] = pd.NA
+                related['df_index'] = related['df_index'].astype('Int64')
+                score = pd.concat([score, related], ignore_index=True)
 
 
         # error check index inputs
@@ -151,38 +165,49 @@ class entity_resolver():
                 raise RuntimeError(f'index_df2 provided is not a valid index: {list(check[missing])}')
 
         # select indices by parameters given
-        if index_df2 is None:
-            comparison = processed.loc[processed['df_index'].isin(index_df), ['df_index', category]]
-            comparison = comparison.merge(score, on='df_index')
-            if self._index_mask['df2'] is not None:
-                related = comparison[['df_index',category,'df2_index']].dropna(subset='df2_index')
-                related = related.merge(score[['df2_index','df2_index_similar','score']], on='df2_index')
-                related = related.dropna(subset='df2_index_similar')
-                related = related.drop(columns=['df2_index'])
-                comparison = pd.concat([comparison, related])
+        if index_df is not None:
+            comparison = score[score['df_index'].isin(index_df) | score['df_index_similar'].isin(index_df)]
         else:
-            comparison = processed.loc[processed['df2_index'].isin(index_df2), ['df2_index', category]]
-            comparison = comparison.merge(score, on='df2_index')
-            # include similar values within the same dataframe
-            related = comparison[['df2_index',category,'df_index']].dropna(subset='df_index')
-            related = related.merge(score[['df_index','df_index_similar','score']], on='df_index')
-            related = related.dropna(subset='df_index_similar')
-            related = related.drop(columns=['df_index'])
-            comparison = pd.concat([comparison, related])
-        
+            comparison = score[score['df2_index'].isin(index_df2) | score['df2_index_similar'].isin(index_df2)]
 
-        # add similar values from first df
-        similar = processed[['df_index', category]]
-        similar = similar.dropna(subset='df_index')
-        similar = similar.rename(columns={'df_index': 'df_index_similar'})
-        comparison = comparison.merge(similar, on='df_index_similar', suffixes=('','_df_similar'), how='left')
+        # remove mirrored matches where other_index, tfidf_index is the reverse of tfidf_index, other_index
+        first = ~comparison[['df_index','df_index_similar']].apply(frozenset, axis=1).duplicated() 
+        comparison = comparison[first]
 
-        # add similar values from second df
-        if self._index_mask['df2'] is not None:
-            similar = processed[['df2_index', category]]
-            similar = similar.dropna(subset='df2_index')
-            similar = similar.rename(columns={'df2_index': 'df2_index_similar'})
-            comparison = comparison.merge(similar, on='df2_index_similar', suffixes=('','_df2_similar'), how='left')
+        # add processed values compared for df_index, df_index_similar
+        values = processed[['df_index', category]].dropna(subset='df_index')
+        comparison = comparison.merge(
+            values.rename(columns={category: f'df_{category}'}),
+            on='df_index', how='left'
+        )
+        comparison = comparison.merge(
+            values.rename(columns={'df_index': 'df_index_similar', category: f'df_{category}_similar'}),
+            on='df_index_similar', how='left'
+        )
+        # add processed values compared for df2_index, df2_index_similar
+        if two_dfs:
+            values = processed[['df2_index', category]].dropna(subset='df2_index')
+            comparison = comparison.merge(
+                values.rename(columns={category: f'df2_{category}'}),
+                on='df2_index', how='left'
+            )
+            comparison = comparison.merge(
+                values.rename(columns={'df2_index': 'df2_index_similar', category: f'df2_{category}_similar'}),
+                on='df2_index_similar', how='left'
+            )
+
+        # # add similar values from first df
+        # similar = processed[['df_index', category]]
+        # similar = similar.dropna(subset='df_index')
+        # similar = similar.rename(columns={'df_index': 'df_index_similar'})
+        # comparison = comparison.merge(similar, on='df_index_similar', suffixes=('','_df_similar'), how='left')
+
+        # # add similar values from second df
+        # if two_dfs:
+        #     similar = processed[['df2_index', category]]
+        #     similar = similar.dropna(subset='df2_index')
+        #     similar = similar.rename(columns={'df2_index': 'df2_index_similar'})
+        #     comparison = comparison.merge(similar, on='df2_index_similar', suffixes=('','_df2_similar'), how='left')
 
         # sort by first appearing index
         if index_df2 is not None:
@@ -190,7 +215,7 @@ class entity_resolver():
         else:
             comparison = comparison.sort_values('df_index')
 
-        # reset index that doesn't carry meaning for equality testing
+        # for equality testing, reset index that doesn't carry meaning
         comparison = comparison.reset_index(drop=True)
 
         return comparison

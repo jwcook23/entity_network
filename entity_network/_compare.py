@@ -71,6 +71,8 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         similar = pd.DataFrame(similar, columns=['other_index','score'], index=tfidf_index.index)
         similar.index.name = 'tfidf_index'
         similar = similar.apply(pd.Series.explode)
+        similar['other_index'] = similar['other_index'].astype('int64')
+        similar['score'] = similar['score'].astype('float64')
         similar = similar.reset_index()
         similar['score'] = similar['score']*-1
 
@@ -82,6 +84,12 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
 
         # ignore matches to the same value
         similar = similar[similar['tfidf_index']!=similar['other_index']]   
+
+        # # remove mirrored matches where other_index, tfidf_index is the reverse of tfidf_index, other_index
+        # ordered = similar[['tfidf_index','other_index']].values
+        # ordered.sort(axis=1)
+        # similar[['tfidf_index','other_index']] = ordered
+        # similar = similar.drop_duplicates(subset=['tfidf_index','other_index'])
 
         # replace tfidf_index with original unique data index
         similar = similar.merge(tfidf_index, left_on='tfidf_index', right_index=True)

@@ -44,14 +44,16 @@ def test_similar_address():
         'df_index': list_notna,
         'df2_index': list_notna
     })
-    assert (actual['df_index']==actual['df2_index']).all()
 
+    assert 1==0
+
+    # assert (actual['df_index']==actual['df2_index']).all()
     # assert len(missing_df)==0
     # assert len(actual)==len(df2)
-    actual = actual.apply(pd.Series.explode)
-    missing_df = df1.index[~df1.index.isin(actual['df_index'])]
-    missing_df2 = df2.index[~df2.index.isin(actual['df2_index'])]
-    er.debug_similar('address', missing_df, missing_df2)
+    # actual = actual.apply(pd.Series.explode)
+    # missing_df = df1.index[~df1.index.isin(actual['df_index'])]
+    # missing_df2 = df2.index[~df2.index.isin(actual['df2_index'])]
+    # er.debug_similar('address', missing_df, missing_df2)
 
 def test_combine_similar_exact():
 

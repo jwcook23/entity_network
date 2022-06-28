@@ -51,10 +51,10 @@ def test_two_dfs_index_df(df_samples):
 
     actual = comparison[['df_index','df_index_similar','df2_index','df2_index_similar']]
     expected = pd.DataFrame({
-        'df_index': [0,0,3],
-        'df_index_similar': [2, 1, pd.NA],
-        'df2_index': [pd.NA]*3,
-        'df2_index_similar': [pd.NA, pd.NA, 1]
+        'df_index': [0,0,0,3,3],
+        'df_index_similar': [2, 1, pd.NA, pd.NA, 4],
+        'df2_index': [pd.NA, pd.NA, 0, pd.NA, pd.NA],
+        'df2_index_similar': [pd.NA, pd.NA, pd.NA, 1, pd.NA]
     }, dtype='Int64')
 
     assert actual.equals(expected)
@@ -67,12 +67,12 @@ def test_two_dfs_index_df2(df_samples):
 
     comparison = er.index_comparison('address', index_df2=[0,1])
 
-    actual = comparison[['df2_index','df_index','df_index_similar','df2_index_similar']]
+    actual = comparison[['df_index','df_index_similar','df2_index','df2_index_similar']]
     expected = pd.DataFrame({
-        'df2_index': [0,0,0,1],
-        'df_index': [2, pd.NA, pd.NA, pd.NA],
-        'df_index_similar': [pd.NA, 0, 1, 3],
-        'df2_index_similar': [pd.NA]*4
+        'df_index': [2, 0, 1, 3, pd.NA],
+        'df_index_similar': [pd.NA, pd.NA, pd.NA, pd.NA, 4],
+        'df2_index': [0,0,0,pd.NA, pd.NA],
+        'df2_index_similar': [pd.NA, pd.NA, pd.NA, 1, 1]
     }, dtype='Int64')
 
     assert actual.equals(expected)
