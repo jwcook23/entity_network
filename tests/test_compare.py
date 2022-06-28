@@ -30,6 +30,7 @@ def test_similar_address():
     file_path = os.path.join('tests','similar_address.csv')
 
     df = pd.read_csv(file_path)
+    df = df[df['threshold=0.7']==1]
     df1 = df[['Address0']]
     df2 = df[['Address1']]
 
@@ -45,15 +46,16 @@ def test_similar_address():
         'df2_index': list_notna
     })
 
-    assert 1==0
 
-    # assert (actual['df_index']==actual['df2_index']).all()
-    # assert len(missing_df)==0
-    # assert len(actual)==len(df2)
-    # actual = actual.apply(pd.Series.explode)
-    # missing_df = df1.index[~df1.index.isin(actual['df_index'])]
-    # missing_df2 = df2.index[~df2.index.isin(actual['df2_index'])]
-    # er.debug_similar('address', missing_df, missing_df2)
+    actual = actual.apply(pd.Series.explode)
+    missing_df = df1.index[~df1.index.isin(actual['df_index'])]
+    missing_df2 = df2.index[~df2.index.isin(actual['df2_index'])]
+
+    # comparison = er.index_comparison('address', index_df=missing_df, index_df2=missing_df2)
+    assert (actual['df_index']==actual['df2_index']).all()
+    assert len(missing_df)==0
+    assert len(missing_df2)==0
+
 
 def test_combine_similar_exact():
 

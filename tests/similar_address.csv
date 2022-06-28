@@ -1,4 +1,4 @@
-Address0,Address1,Match
+Address0,Address1,threshold=0.7
 3148 amy falls mission reedmouth nv 56583,3148 w amy falls mission reedmouth nv 56583,1
 698 20 street port destiny la 08519,698 20th st port destiny la 08519,1
 0364 derrick place drive justinstad nm 48683,0364 derrick place dr justinstad nm 48683,1
@@ -99,7 +99,7 @@ Address0,Address1,Match
 9244 warren mountains port whitneyside ky 84082,9244 warren mountains port unit 117 whitneyside ky 84082,1
 9003 village center vanessaport al 42668,9003 stanton center vanessaport al 42668,1
 72070 6th street sheppardfort al 33025,72070 michigan st sheppardfort al 33025,1
-44254 56 flats saint petersburg md 33871,44254 56th flats villa 57 st petersburg md 33871,1
+44254 56 flats saint petersburg md 33871,44254 56th flats villa 57 st petersburg md 33871,0
 02834 dean gateway squares saint petersburg md 17266,02834 dean gateway squares unit 24s st petersburg md 17266,1
 8689 weaver trace points saint petersburg pa 83247,8689 weaver trace points apt 416 st petersburg pa 83247,1
 7399 edwinola way reillymouth ne 89093,7399 14th st reillymouth ne 89093,0

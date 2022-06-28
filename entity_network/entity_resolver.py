@@ -149,25 +149,26 @@ class entity_resolver():
 
 
         # error check index inputs
-        if index_df is None and index_df2 is None:
-            raise RuntimeError('One of index_df or index_df2 must be provided.')
-        elif index_df is not None and index_df2 is not None:
-            raise RuntimeError('Only one of index_df or index_df2 can be provided.')
-        elif index_df is not None:
+        if index_df is not None:
             check = pd.Series(index_df)
             missing = ~check.isin(processed['df_index'])
             if any(missing):
                 raise RuntimeError(f'index_df provided is not a valid index: {list(check[missing])}')
-        elif index_df2 is not None:
+        if index_df2 is not None:
             check = pd.Series(index_df2)
             missing = ~check.isin(processed['df2_index'])
             if any(missing):
                 raise RuntimeError(f'index_df2 provided is not a valid index: {list(check[missing])}')
 
         # select indices by parameters given
-        if index_df is not None:
+        if index_df is not None and index_df2 is not None:
+            comparison = score[
+                (score['df_index'].isin(index_df) | score['df_index_similar'].isin(index_df)) &
+                (score['df2_index'].isin(index_df2) | score['df2_index_similar'].isin(index_df2))
+            ]
+        elif index_df is not None:
             comparison = score[score['df_index'].isin(index_df) | score['df_index_similar'].isin(index_df)]
-        else:
+        elif index_df2 is not None:
             comparison = score[score['df2_index'].isin(index_df2) | score['df2_index_similar'].isin(index_df2)]
 
         # remove mirrored matches where other_index, tfidf_index is the reverse of tfidf_index, other_index
