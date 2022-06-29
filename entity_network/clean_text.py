@@ -1,6 +1,7 @@
 '''Text cleaning functions for different categories of data.'''
-from pandas import Series, NA
+import pandas as pd
 from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
+import flashtext
 
 # TODO: investigate cleantext https://pypi.org/project/clean-text/
 
@@ -46,7 +47,7 @@ def _common_poststeps(prepared):
     prepared = prepared.str.strip()
 
     # set values that only contain text as empty
-    prepared[prepared.str.len()==0] = NA
+    prepared[prepared.str.len()==0] = pd.NA
 
     return prepared
 
@@ -64,16 +65,16 @@ def _remove_stopwords(prepared, stopwords, category):
     return prepared
 
 
-def possible_stopwords(values) -> Series: 
+def possible_stopwords(values) -> pd.Series: 
     '''Count words in decending order.
     
     Parameters
     ----------
-    values (Series) : sentenances of words
+    values (pd.Series) : sentenances of words
 
     Returns
     -------
-    possible_stopwords (Series) : word and count of word apperance
+    possible_stopwords (pd.Series) : word and count of word apperance
     '''
 
     possible_stopwords = values.str.split(r'\s+')
@@ -83,16 +84,16 @@ def possible_stopwords(values) -> Series:
     return possible_stopwords
 
 
-def name(values: Series, stopwords='default') -> Series:
+def name(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess comapany and person names.
 
     Parameters
     ----------
-    values (Series) : values before processing
+    values (pd.Series) : values before processing
 
     Returns
     -------
-    prepared (Series) : values after processing
+    prepared (pd.Series) : values after processing
     '''  
 
     prepared = _common_presteps(values)
@@ -104,16 +105,16 @@ def name(values: Series, stopwords='default') -> Series:
     return _common_poststeps(prepared)
 
 
-def phone(values: Series, stopwords='default') -> Series:
+def phone(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess phone numbers.
 
     Parameters
     ----------
-    values (Series) : values before preprocessing
+    values (pd.Series) : values before preprocessing
 
     Returns
     -------
-    prepared (Series) : values after processing
+    prepared (pd.Series) : values after processing
     '''
 
     # TODO: allow stripping leading digit
@@ -132,18 +133,18 @@ def phone(values: Series, stopwords='default') -> Series:
     return _common_poststeps(prepared)
 
 
-def email(values: Series, stopwords='default') -> Series:
+def email(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess email addresses.
 
     Parameters
     ----------
-    prepared (Series) : values before processing
+    prepared (pd.Series) : values before processing
 
     Returns
     -------
     prepared (DataFrame) : contains prepared email addresses and email domain
-    prepared['email_address'] (Series) : whole email address after processing
-    prepared['email_domain'] (Series) : email domain after processing
+    prepared['email_address'] (pd.Series) : whole email address after processing
+    prepared['email_domain'] (pd.Series) : email domain after processing
     '''
 
     prepared = _common_email(values)
@@ -157,7 +158,7 @@ def email(values: Series, stopwords='default') -> Series:
     return _common_poststeps(prepared)
 
 
-def email_domain(values: Series, stopwords='default') ->Series:
+def email_domain(values: pd.Series, stopwords='default') ->pd.Series:
 
     prepared = _common_email(values)
 
@@ -174,7 +175,7 @@ def email_domain(values: Series, stopwords='default') ->Series:
     return _common_poststeps(prepared)
 
 
-def _common_email(values:Series):
+def _common_email(values:pd.Series):
 
     email = _common_presteps(values)
 
@@ -184,16 +185,16 @@ def _common_email(values:Series):
     return email
 
 
-def address(values: Series, stopwords='default') -> Series:
+def address(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess street addresses.
 
     Parameters
     ----------
-    values (Series) : values before processing
+    values (pd.Series) : values before processing
 
     Returns
     -------
-    prepared (Series) : values after processing
+    prepared (pd.Series) : values after processing
     '''
 
     prepared = _common_presteps(values)
@@ -220,9 +221,13 @@ def address(values: Series, stopwords='default') -> Series:
         'north':'n', 'south':'s', 'east':'e', 'west':'w',
         'northeast':'ne', 'northwest':'nw', 'southeast':'se', 'southwest':'sw'
     }
-    pattern = {r'\b'+k+r'\b':v for k,v in pattern.items()}
-    prepared = prepared.fillna('')
-    prepared = prepared.replace(pattern, regex=True)
+    replacer = flashtext.KeywordProcessor()
+    for k,v in pattern.items():
+        replacer.add_keyword(k,v)
+    prepared = pd.Series(
+        list(map(replacer.replace_keywords, prepared)),
+        dtype='string', index=prepared.index
+    )
 
     # remove space between single characters
     pattern = r'(?<=\b[^\W\d_])\s(?=[^\W\d_]\b)'

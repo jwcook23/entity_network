@@ -138,4 +138,4 @@ def test_address_speed():
     _ = clean_text.address(values)
     duration = time()-tstart
 
-    assert duration<5
+    assert duration<10
