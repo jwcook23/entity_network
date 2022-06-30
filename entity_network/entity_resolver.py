@@ -1,11 +1,10 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from time import time
-from itertools import combinations, product
+from itertools import combinations
 
 import pandas as pd
-import networkx as nx
 
-from entity_network import _index, _prepare, _compare
+from entity_network import _index, _prepare, _compare, _helpers
 
 class entity_resolver():
 
@@ -64,20 +63,30 @@ class entity_resolver():
 
         print('forming network')
 
-        # determine network by matching features
-        tstart = time()
-        network_feature = self.__common_features()
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__common_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        # # determine network by matching features
+        # tstart = time()
+        # network_feature = _helpers.common_features(self.related)
+        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__common_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
-        # create network graph
-        tstart = time()
-        self.network_graph = self.__series_graph(network_feature['index'])
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__series_graph', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        # # create network graph
+        # tstart = time()
+        # self.network_graph = _helpers.series_graph(network_feature['index'])
+        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__series_graph', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # assign network_id to connected records
+        # tstart = time()
+        # network_id = _helpers.assign_id(self.network_graph, 'network_id')
+        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__assign_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+
+        # create network by using relationships
         tstart = time()
-        network_id = self.__assign_id(self.network_graph, 'network_id')
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__assign_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        network_id, network_feature = _helpers.assign_group(self.related, self._df.index)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'assign_group', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        
+        self.related['phone'].head(2)
+        self.related['email'].head(2)
+        network_id.head(2)
+        network_feature.head(2)
 
         # add original index
         tstart = time()
@@ -220,49 +229,3 @@ class entity_resolver():
         comparison = comparison.reset_index(drop=True)
 
         return comparison
-
-    def __series_graph(self, edges):
-        '''Convert Pandas series of lists to graph.'''
-
-        edges = edges.apply(lambda x: list(combinations(x,2)))
-
-        graph = nx.Graph()
-        for e in edges.values:
-            graph.add_edges_from(e)
-        
-        return graph
-
-
-    def __assign_id(self, graph, id_name):
-
-        df_id = pd.DataFrame({'index': list(nx.connected_components(graph))})
-        df_id[id_name] = range(0, len(df_id))
-        df_id = df_id.explode('index')
-
-        return df_id
-
-
-    def __common_features(self):
-
-        df_feature = []
-        for category,related in self.related.items():
-
-            category_id = f'{category}_id'
-            feature = related.reset_index()
-
-            # aggreate values to form network
-            feature = feature.groupby(category_id)
-            feature = feature.agg({'index': tuple, 'column': tuple})
-
-            # remove records that only match the same record
-            feature = feature.loc[
-                feature['index'].apply(lambda x: len(set(x))>1)
-            ]
-
-            # append details for category
-            df_feature.append(feature)
-        # dataframe of all matching features
-        df_feature = pd.concat(df_feature, ignore_index=True)
-        df_feature.index.name = 'feature_id'
-
-        return df_feature

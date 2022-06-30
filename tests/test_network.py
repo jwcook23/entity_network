@@ -6,7 +6,7 @@ from entity_network.entity_resolver import entity_resolver
 
 import sample
 
-def test_single_category():
+def test_single_category_exact():
 
     n_unique = 1000
     n_duplicates = 30
@@ -34,7 +34,7 @@ def test_single_category():
     assert (feature==2).all()
 
 
-def test_all_category():
+def test_all_category_exact():
 
     n_unique = 1000
     n_duplicates = 30
@@ -67,7 +67,7 @@ def test_all_category():
     assert (feature==2).all()
 
 
-def test_two_dfs():
+def test_two_dfs_exact():
 
     n_unique = 1000
     n_duplicates = 30
@@ -97,7 +97,7 @@ def test_two_dfs():
         assert (feature==match['size']).all()
 
 
-def test_record_self():
+def test_record_self_exact():
 
     sample_df = pd.DataFrame({
         'Name': ['NameA', 'NameB','NameC'],
