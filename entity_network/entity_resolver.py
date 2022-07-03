@@ -82,11 +82,6 @@ class entity_resolver():
         tstart = time()
         network_id, network_feature = _helpers.assign_group(self.related, self._df.index)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'assign_group', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
-        
-        self.related['phone'].head(2)
-        self.related['email'].head(2)
-        network_id.head(2)
-        network_feature.head(2)
 
         # add original index
         tstart = time()

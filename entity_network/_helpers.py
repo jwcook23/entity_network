@@ -1,6 +1,7 @@
 from itertools import combinations
 
 import pandas as pd
+import numpy as np
 import networkx as nx
 
 def assign_group(relationships, indices):
@@ -9,37 +10,71 @@ def assign_group(relationships, indices):
     # graph = _series_graph(df_feature)
     # df_id = _assign_id(graph)
 
-    df_id = pd.DataFrame(index=indices)
-    for category, related in relationships.items():
-        category_id = f'{category}_id'
-        df_id = df_id.merge(related[category_id], how='left', left_index=True, right_index=True)
-        df_id[category_id] = df_id[category_id].astype('Int64')
-    df_id = df_id[df_id.notna().any(axis='columns')]
-
-    # https://stackoverflow.com/questions/61763966/python-numpy-grouping-array-rows-by-a-common-element
-    import numpy as np
-    a = df_id.values
-    a = np.array([
-        [1,2,3],
-        [0,4,2],
-        [4,2,5],
-        [6,1,1],
-        [1,3,5],
-        [3,0,1],
-        [0,4,2],
-        [1, np.nan, np.nan],
-        [7, np.nan, np.nan]
-    ])
-    pairs = np.argwhere(((a[:,None]-a)==0).any(axis=2))
-    b = np.arange(a.shape[0])
-    for pair in pairs:
-        b[np.flatnonzero(b==b[pair[1]])] = b[pair[0]]
-    b = b - b.min()
-    df_id['network_id'] = b
-
-    df_feature = None
+    df_feature = _combine_features(relationships, indices)
+    df_feature = _row_connected(df_feature)
+    df_id = _unique_id(df_feature)
 
     return df_id, df_feature
+
+def _combine_features(relationships, indices):
+    '''Combine records with matching feature ids.'''
+
+    df_feature = pd.DataFrame(index=indices)
+    for category, related in relationships.items():
+        category_id = f'{category}_id'
+        feature_name = f'{category}_feature'
+        related = related[['id', 'column']].copy()
+        related = related.rename(columns={'id': category_id, 'column': feature_name})
+        df_feature = df_feature.merge(related, how='left', left_index=True, right_index=True)
+        df_feature[category_id] = df_feature[category_id].astype('Int64')
+    df_feature = df_feature[df_feature.notna().any(axis='columns')]
+    df_feature.index.name = 'index'
+    df_feature = df_feature.reset_index()
+
+    return df_feature
+
+def _row_connected(df):
+    '''Assign a group_id to rows sharing a common column value.'''
+    
+    # extract values for numpy comparison
+    columns = df.columns[df.columns.str.endswith('_id')]
+    values = df[columns].to_numpy(na_value=np.nan)
+    values = np.vstack(values[:, :]).astype(np.float)
+
+    # compare the difference of all elements
+    matches = (values[:,None]-values)==0
+    # find matches in other rows (each row corresponds to the row in A, each column is the comparison to other rows in A)
+    matches = matches.any(axis=2)
+
+    # find indices of match groups
+    groups = np.argwhere(matches)
+    # remove self matches in groups
+    groups = groups[groups[:,0]!=groups[:,1]]
+    # remove duplicates in groups
+    groups.sort(axis=1)
+    groups = np.unique(groups, axis=0)
+
+    # assign the same group id to row groups
+    group_id = np.arange(values.shape[0])
+    for row_pair in groups:
+        row0 = row_pair[0]
+        row1 = row_pair[1]
+        assign = np.flatnonzero(group_id==group_id[row1])
+        group_id[assign] = group_id[row0]
+
+    # assign id to input df
+    df['network_id'] = group_id
+    df['network_id'] = df['network_id'].astype('int64')
+
+    return df
+
+def _unique_id(df_feature):
+    '''Exact unique network_id for each index.'''
+
+    df_id = df_feature[['index','network_id']]
+    df_id = df_id.drop_duplicates(subset='index')
+    
+    return df_id
 
 
 def _common_features(relationships):

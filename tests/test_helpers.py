@@ -1,30 +1,31 @@
 import pandas as pd
-
+import numpy as np
 from entity_network import _helpers
 
-from scipy.sparse import bsr_array
+def test_column_group():
 
-# def test_large_series_graph():
+    df = pd.DataFrame([
+        [1,5],
+        [1,8],
+        [3,4],
+        [2,8],
+        [9,pd.NA],
+        [0,pd.NA]
+    ], dtype='Int64')
 
-edges = pd.Series([
-    range(0,5000),
-    (0,2)
-])
-
-# graph = _helpers.series_graph(edges)
+    df = _helpers._row_connected(df)
+    assert df['network_id'].equals(pd.Series([0,0,2,0,4,5]))
 
 
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
+    df = pd.DataFrame([
+        [1,2,3],
+        [0,4,2],
+        [4,2,5],
+        [6,1,1],
+        [1,3,5],
+        [3,0,1],
+        [0,4,np.nan],
+    ])
 
-graph = [
-[0, 1, 1, 0, 0],
-[0, 0, 1, 0, 0],
-[0, 0, 0, 0, 0],
-[0, 0, 0, 0, 1],
-[0, 0, 0, 0, 0]
-]
-
-graph = csr_matrix(graph)
-
-n_components, labels = connected_components(csgraph=graph, directed=False, return_labels=True)
+    df = _helpers._row_connected(df)
+    assert df['network_id'].equals(pd.Series([0, 1, 0, 3, 0, 3, 1]))

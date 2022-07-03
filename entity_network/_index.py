@@ -73,9 +73,9 @@ def related(df_id, df_feature, index_mask):
     df_id = original(df_id, index_mask)
 
     # add original index in feature dataframe
-    df_feature = df_feature.apply(pd.Series.explode)
-    df_feature = df_feature.reset_index()
-    df_feature = df_feature.merge(df_id, on='index')
+    # df_feature = df_feature.apply(pd.Series.explode)
+    # df_feature = df_feature.reset_index()
+    df_feature = df_feature.merge(df_id.drop(columns=['network_id']), on='index')
 
     # remove artifical create index
     df_id = df_id.set_index('index')

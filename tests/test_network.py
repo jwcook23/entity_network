@@ -61,11 +61,16 @@ def test_all_category_exact():
     assert (relation==2).all()   
 
     # check relationship matching features
-    feature = network_feature.merge(sample_feature, on=['df_index', 'column'])
-    feature = feature.groupby(['feature_id','sample_id']).size()
-    assert len(feature)==n_duplicates*len(list(chain(*columns_compare.values())))
-    assert (feature==2).all()
-
+    for category, cols in columns_compare.items():
+        id_name = f'{category}_id'
+        feature_name = f'{category}_feature'
+        # unique values since matching on multiple columns may produce duplicate index
+        expected = sample_feature[['df_index','sample_id',feature_name]].drop_duplicates()
+        feature = network_feature[['df_index',id_name,feature_name]].drop_duplicates()
+        # ensure two indices match on each column for each feature
+        feature = feature.merge(expected, on=['df_index',feature_name])
+        assert (feature[id_name].value_counts()==2).all()
+        assert len(feature)==n_duplicates*len(cols)
 
 def test_two_dfs_exact():
 

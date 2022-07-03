@@ -43,16 +43,13 @@ def duplicate_records(df1, n_duplicates, columns):
     sample_id = sample_id.explode('df_index')
 
     # assertion for matching feature columns
-    feature = list(chain(*columns.values()))
     sample_feature = pd.DataFrame({'df_index': list(zip(index_df1, index_df2))})
-    sample_feature['column'] = [[feature, feature]]*len(sample_feature)
-    sample_feature['sample_id'] = range(0, len(sample_feature)*len(cols), len(cols))
-    sample_feature['sample_id'] = sample_feature['sample_id'].apply(lambda x: range(x, x+len(cols)))
-    sample_feature['sample_id'] = sample_feature['sample_id'].apply(lambda x: [x, x])
-    sample_feature = sample_feature.apply(pd.Series.explode)
-    sample_feature = sample_feature.set_index('df_index')
-    sample_feature = sample_feature.apply(pd.Series.explode)
-    sample_feature = sample_feature.reset_index()
+    sample_feature['sample_id'] = range(0, len(sample_feature))
+    sample_feature = sample_feature.explode('df_index')
+    for category, values in columns.items():
+        sample_feature[f'{category}_feature'] = [values]*len(sample_feature)
+    for category in columns.keys():
+        sample_feature = sample_feature.explode(f'{category}_feature')
 
     # generate the sample frame
     sample_df = pd.concat([df1, df2])
