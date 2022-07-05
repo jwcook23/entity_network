@@ -43,17 +43,14 @@ def duplicate_records(df1, n_duplicates, columns):
     sample_id['sample_id'] = range(0, len(sample_id))
     sample_id = sample_id.explode('df_index')
 
-    # assertion for matching map of features
-    sample_map = pd.DataFrame({'df_index': list(zip(index_df1, index_df2))})
-    for category, values in columns.items():
-        sample_map[f'{category}_id'] = np.array_split(range(0, n_duplicates*len(values)), n_duplicates)
-    # for category in columns.keys():
-    #     sample_map = sample_map.explode(f'{category}_id')
-    sample_map = sample_map.explode('df_index')
-    sample_map = sample_map.set_index('df_index')
-
     # generate the sample frame
     sample_df = pd.concat([df1, df2])
+
+    # assertion for matching map of features
+    sample_map = sample_id.groupby('sample_id')
+    sample_map = sample_map.agg({'df_index': list})
+    for category, values in columns.items():
+        sample_map[f'{category}_id'] = np.array_split(range(0, n_duplicates*len(values)), n_duplicates)
 
     return sample_df, sample_id, sample_map
 
@@ -73,25 +70,9 @@ def address_components(n_unique):
     return sample_df
 
 
-def similar_df(df1, n_duplicates):
+def duplicate_df(df1, n_duplicates, columns):
     '''Generate records for two dataframes where df2 shares values with df1 but is rearranged. df2 contains
     two rows for each duplicated record from df1.'''
-
-    columns_compare = {
-        'phone': ['HomePhone','WorkPhone','CellPhone', 'Phone'],
-        'email': ['Email','EmailAddress'],
-        'address': ['Address','StreetAddress']
-    }
-    columns_match = {
-        'df_index': {
-            'columns': ['HomePhone', 'Email', 'Address'], 
-            'size': 1
-        },
-        'df2_index': {
-            'columns': ['Phone', 'EmailAddress', 'StreetAddress'],
-            'size': 2
-        }
-    }
 
     # df2 using values from df1
     sample_index = random.sample(df1.index.tolist(), k=n_duplicates)
@@ -122,12 +103,12 @@ def similar_df(df1, n_duplicates):
     df2 = df2.drop(columns=['HomePhone','WorkPhone','CellPhone'])
 
     # assertion for matching feature columns
-    sample_feature = sample_id.copy()
-    sample_feature['column'] = None
-    feature_df = sample_feature.index[sample_feature['df_index'].notna()]
-    sample_feature.loc[feature_df, 'column'] = pd.Series([['Email','Address','HomePhone']]*len(feature_df), index=feature_df)
-    feature_df2 = sample_feature.index[sample_feature['df2_index'].notna()]
-    sample_feature.loc[feature_df2, 'column'] = pd.Series([['EmailAddress','StreetAddress','Phone']]*len(feature_df2), index=feature_df2)
-    sample_feature = sample_feature.explode('column')
+    sample_map = pd.concat([
+        sample_id[['df_index','sample_id']].dropna().groupby('sample_id').agg({'df_index': list}),
+        sample_id[['df2_index','sample_id']].dropna().groupby('sample_id').agg({'df2_index': list}),
+    ], axis='columns')
+    for category in columns.keys():
+        sample_map[f'{category}_id'] = range(0, n_duplicates)
+        sample_map[f'{category}_id'] = sample_map[f'{category}_id'].apply(lambda x: [x])
 
-    return df2, sample_id, sample_feature, columns_compare, columns_match
+    return df2, sample_id, sample_map
