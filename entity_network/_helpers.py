@@ -4,41 +4,39 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-def assign_group(relationships, indices):
+# def assign_group(relationships, indices):
 
-    # df_feature = _common_features(relationships)
-    # graph = _series_graph(df_feature)
-    # df_id = _assign_id(graph)
+#     # network_map = _common_features(relationships)
+#     # graph = _series_graph(network_map)
+#     # df_id = _assign_id(graph)
 
-    df_feature = _combine_features(relationships, indices)
-    df_feature = _row_connected(df_feature)
-    df_id = _unique_id(df_feature)
+#     network_map = _combine_features(relationships, indices)
+#     network_map = _row_connected(network_map)
+#     df_id = _unique_id(network_map)
 
-    return df_id, df_feature
+#     return df_id, network_map
 
-def _combine_features(relationships, indices):
+def combine_features(relationships, indices):
     '''Combine records with matching feature ids.'''
 
-    df_feature = pd.DataFrame(index=indices)
+    network_map = pd.DataFrame(index=indices)
     for category, related in relationships.items():
-        category_id = f'{category}_id'
-        feature_name = f'{category}_feature'
-        related = related[['id', 'column']].copy()
-        related = related.rename(columns={'id': category_id, 'column': feature_name})
-        df_feature = df_feature.merge(related, how='left', left_index=True, right_index=True)
-        df_feature[category_id] = df_feature[category_id].astype('Int64')
-    df_feature = df_feature[df_feature.notna().any(axis='columns')]
-    df_feature.index.name = 'index'
-    df_feature = df_feature.reset_index()
+        id_category = f'{category}_id'
+        related = related[[id_category]].copy()
+        network_map = network_map.merge(related, how='left', left_index=True, right_index=True)
+        network_map[id_category] = network_map[id_category].astype('Int64')
+    network_map = network_map[network_map.notna().any(axis='columns')]
+    network_map.index.name = 'index'
+    network_map = network_map.reset_index()
 
-    return df_feature
+    return network_map
 
-def _row_connected(df):
+def overall_id(network_map):
     '''Assign a group_id to rows sharing a common column value.'''
     
     # extract values for numpy comparison
-    columns = df.columns[df.columns.str.endswith('_id')]
-    values = df[columns].to_numpy(na_value=np.nan)
+    columns = network_map.columns[network_map.columns.str.endswith('_id')]
+    values = network_map[columns].to_numpy(na_value=np.nan)
     values = np.vstack(values[:, :]).astype(np.float)
 
     # compare the difference of all elements
@@ -63,60 +61,61 @@ def _row_connected(df):
         group_id[assign] = group_id[row0]
 
     # assign id to input df
-    df['network_id'] = group_id
-    df['network_id'] = df['network_id'].astype('int64')
+    network_map['network_id'] = group_id
+    network_map['network_id'] = network_map['network_id'].astype('int64')
 
-    return df
+    # determine overall network id
+    network_id = network_map[['index','network_id']]
+    network_id = network_id.drop_duplicates(subset='index')
 
-def _unique_id(df_feature):
-    '''Exact unique network_id for each index.'''
-
-    df_id = df_feature[['index','network_id']]
-    df_id = df_id.drop_duplicates(subset='index')
-    
-    return df_id
+    return network_id, network_map
 
 
-def _common_features(relationships):
+def flatten_related():
 
-    df_feature = []
-    for category,related in relationships.items():
+    pass
 
-        category_id = f'{category}_id'
-        feature = related.reset_index()
 
-        # aggreate values to form network
-        feature = feature.groupby(category_id)
-        feature = feature.agg({'index': tuple, 'column': tuple})
+# def _common_features(relationships):
 
-        # remove records that only match the same record
-        feature = feature.loc[
-            feature['index'].apply(lambda x: len(set(x))>1)
-        ]
+#     network_map = []
+#     for category,related in relationships.items():
 
-        # append details for category
-        df_feature.append(feature)
-    # dataframe of all matching features
-    df_feature = pd.concat(df_feature, ignore_index=True)
-    df_feature.index.name = 'feature_id'
+#         category_id = f'{category}_id'
+#         feature = related.reset_index()
 
-    return df_feature
+#         # aggreate values to form network
+#         feature = feature.groupby(category_id)
+#         feature = feature.agg({'index': tuple, 'column': tuple})
 
-def _series_graph(df_feature):
-    '''Convert Pandas series of lists to graph.'''
+#         # remove records that only match the same record
+#         feature = feature.loc[
+#             feature['index'].apply(lambda x: len(set(x))>1)
+#         ]
 
-    edges = df_feature['index'].apply(lambda x: list(combinations(x,2)))
+#         # append details for category
+#         network_map.append(feature)
+#     # dataframe of all matching features
+#     network_map = pd.concat(network_map, ignore_index=True)
+#     network_map.index.name = 'feature_id'
 
-    edges = edges.explode()
-    edges = pd.DataFrame(edges.tolist(), columns=['source','target'])
-    graph = nx.from_pandas_edgelist(edges)
+#     return network_map
 
-    return graph
+# def _series_graph(network_map):
+#     '''Convert Pandas series of lists to graph.'''
 
-def _assign_id(graph):
+#     edges = network_map['index'].apply(lambda x: list(combinations(x,2)))
 
-    df_id = pd.DataFrame({'index': list(nx.connected_components(graph))})
-    df_id['network_id'] = range(0, len(df_id))
-    df_id = df_id.explode('index')
+#     edges = edges.explode()
+#     edges = pd.DataFrame(edges.tolist(), columns=['source','target'])
+#     graph = nx.from_pandas_edgelist(edges)
 
-    return df_id
+#     return graph
+
+# def _assign_id(graph):
+
+#     df_id = pd.DataFrame({'index': list(nx.connected_components(graph))})
+#     df_id['network_id'] = range(0, len(df_id))
+#     df_id = df_id.explode('index')
+
+#     return df_id

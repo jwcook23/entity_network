@@ -2,6 +2,7 @@
 import random
 from itertools import chain
 import pandas as pd
+import numpy as np
 from faker import Faker
 
 
@@ -42,19 +43,19 @@ def duplicate_records(df1, n_duplicates, columns):
     sample_id['sample_id'] = range(0, len(sample_id))
     sample_id = sample_id.explode('df_index')
 
-    # assertion for matching feature columns
-    sample_feature = pd.DataFrame({'df_index': list(zip(index_df1, index_df2))})
-    sample_feature['sample_id'] = range(0, len(sample_feature))
-    sample_feature = sample_feature.explode('df_index')
+    # assertion for matching map of features
+    sample_map = pd.DataFrame({'df_index': list(zip(index_df1, index_df2))})
     for category, values in columns.items():
-        sample_feature[f'{category}_feature'] = [values]*len(sample_feature)
-    for category in columns.keys():
-        sample_feature = sample_feature.explode(f'{category}_feature')
+        sample_map[f'{category}_id'] = np.array_split(range(0, n_duplicates*len(values)), n_duplicates)
+    # for category in columns.keys():
+    #     sample_map = sample_map.explode(f'{category}_id')
+    sample_map = sample_map.explode('df_index')
+    sample_map = sample_map.set_index('df_index')
 
     # generate the sample frame
     sample_df = pd.concat([df1, df2])
 
-    return sample_df, sample_id, sample_feature
+    return sample_df, sample_id, sample_map
 
 
 def address_components(n_unique):

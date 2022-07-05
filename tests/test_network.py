@@ -6,6 +6,27 @@ from entity_network.entity_resolver import entity_resolver
 
 import sample
 
+def check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates):
+
+     # check expected network relationships exist
+    relation = network_id.merge(sample_id, on='df_index')
+    relation = relation.groupby(['network_id','sample_id']).size()
+    assert len(relation)==n_duplicates
+    assert (relation==2).all()   
+
+    # check relationship matching features are correct
+    relation = network_map.groupby('df_index')
+    relation = relation.agg({f'{col}_id': 'unique' for col in columns.keys()})
+    relation = relation.merge(sample_map, left_index=True, right_index=True, suffixes=('_actual','_sample'))
+    for category, cols in columns.items():
+        id_names = [f'{category}_id_actual', f'{category}_id_sample']
+        check = relation[id_names]
+        check = check.apply(pd.Series.explode)
+        check = check.groupby(id_names)
+        check = check.size()
+        assert len(check)==n_duplicates*len(cols)
+        assert (check==2).all()
+
 def test_single_category_exact():
 
     n_unique = 1000
@@ -14,24 +35,15 @@ def test_single_category_exact():
     # generate sample data
     sample_df = sample.unique_records(n_unique)
     columns = {'phone': ['HomePhone','WorkPhone','CellPhone']}
-    sample_df, sample_id, sample_feature = sample.duplicate_records(sample_df, n_duplicates, columns)
+    sample_df, sample_id, sample_map = sample.duplicate_records(sample_df, n_duplicates, columns)
 
     # compare and derive network
     er = entity_resolver(sample_df)
     er.compare('phone', columns=columns['phone'])
-    network_id, network_feature = er.network()
+    network_id, network_map, _ = er.network()
 
-    # check expected network relationships exist
-    relation = network_id.merge(sample_id, on='df_index')
-    relation = relation.groupby(['network_id','sample_id']).size()
-    assert len(relation)==n_duplicates
-    assert (relation==2).all()
-
-    # check relationship matching features
-    feature = network_feature.merge(sample_feature, on=['df_index', 'column'])
-    feature = feature.groupby(['feature_id','sample_id']).size()
-    assert len(feature)==n_duplicates*len(columns['phone'])
-    assert (feature==2).all()
+    # assert results
+    check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates)
 
 
 def test_all_category_exact():
@@ -41,36 +53,21 @@ def test_all_category_exact():
 
     # generate sample data
     sample_df = sample.unique_records(n_unique)
-    columns_compare = {
+    columns = {
         'phone': ['HomePhone','WorkPhone','CellPhone'],
         'email': ['Email'],
         'address': ['Address']
     }
-    sample_df, sample_id, sample_feature = sample.duplicate_records(sample_df, n_duplicates, columns_compare)
+    sample_df, sample_id, sample_map = sample.duplicate_records(sample_df, n_duplicates, columns)
 
     # compare and derive network
     er = entity_resolver(sample_df)
-    for category, cols in columns_compare.items():
+    for category, cols in columns.items():
         er.compare(category, columns=cols, text_cleaner=None)
-    network_id, network_feature = er.network()
+    network_id, network_map, _ = er.network()
 
-     # check expected network relationships exist
-    relation = network_id.merge(sample_id, on='df_index')
-    relation = relation.groupby(['network_id','sample_id']).size()
-    assert len(relation)==n_duplicates
-    assert (relation==2).all()   
-
-    # check relationship matching features
-    for category, cols in columns_compare.items():
-        id_name = f'{category}_id'
-        feature_name = f'{category}_feature'
-        # unique values since matching on multiple columns may produce duplicate index
-        expected = sample_feature[['df_index','sample_id',feature_name]].drop_duplicates()
-        feature = network_feature[['df_index',id_name,feature_name]].drop_duplicates()
-        # ensure two indices match on each column for each feature
-        feature = feature.merge(expected, on=['df_index',feature_name])
-        assert (feature[id_name].value_counts()==2).all()
-        assert len(feature)==n_duplicates*len(cols)
+    # assert results
+    check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates)
 
 def test_two_dfs_exact():
 

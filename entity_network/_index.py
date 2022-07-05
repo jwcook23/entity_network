@@ -62,7 +62,7 @@ def original(reindexed, index_mask, index_name = 'index'):
     return reindexed
 
 
-def related(df_id, df_feature, index_mask):
+def network(df_id, df_feature, index_mask):
 
     # add original index in id dataframe
     # df_id = df_id.merge(index_mask['df'], left_on='index', right_index=True, how='left')

@@ -13,9 +13,9 @@ class entity_resolver():
 
         self._df, self._index_mask = _index.unique(df, df2)
 
-        self.related = {}
-        self.similar = {}
-        # self.network_feature = None
+        self.network_feature = {}
+        self.similar_feature = {}
+        # self.network_map = None
         # self.network_id = None
         # self.entity_feature = None
         # self.entity_id = None
@@ -48,7 +48,7 @@ class entity_resolver():
         # compare values on similarity threshold
         print(f'comparing {columns}')
         tstart = time()
-        self.related[category], self.similar[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
+        self.network_feature[category], self.similar_feature[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # add original index to processed values
@@ -63,35 +63,25 @@ class entity_resolver():
 
         print('forming network')
 
-        # # determine network by matching features
-        # tstart = time()
-        # network_feature = _helpers.common_features(self.related)
-        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__common_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
-
-        # # create network graph
-        # tstart = time()
-        # self.network_graph = _helpers.series_graph(network_feature['index'])
-        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__series_graph', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
-
-        # assign network_id to connected records
-        # tstart = time()
-        # network_id = _helpers.assign_id(self.network_graph, 'network_id')
-        # self.timer = pd.concat([self.timer, pd.DataFrame([['network', 'self', '__assign_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
-
-        # create network by using relationships
+        # form matrix of indices connected on any feature
         tstart = time()
-        network_id, network_feature = _helpers.assign_group(self.related, self._df.index)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'assign_group', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        network_map = _helpers.combine_features(self.network_feature, self._df.index)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'combine_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+
+        # determine an overall id using indices connected on any feature
+        tstart = time()
+        network_id, network_map = _helpers.overall_id(network_map)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'overall_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # add original index
         tstart = time()
-        network_id, network_feature = _index.related(network_id, network_feature, self._index_mask)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'original', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        network_id, network_map = _index.network(network_id, network_map, self._index_mask)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'network', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
 
-        return network_id, network_feature
+        return network_id, network_map, self.network_feature
 
 
     def index_comparison(self, category, index_df: list = None, index_df2: list = None):
@@ -111,11 +101,11 @@ class entity_resolver():
 
         # select processed text and similarity score for category
         processed = self.processed[category][cols_processed]
-        score = self.similar[category][cols_score]
+        score = self.similar_feature[category][cols_score]
 
         # include exact matches
         id_exact = f'{category}_id_exact'
-        exact = self.related[category][cols_exact+[id_exact]]
+        exact = self.network_feature[category][cols_exact+[id_exact]]
         if exact[id_exact].notna().any():
             list_notna = lambda l: [x for x in l if pd.notna(x)]
             list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],pd.NA)] if len(x)>0 else [(pd.NA, pd.NA)])
