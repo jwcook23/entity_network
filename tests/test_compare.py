@@ -19,11 +19,11 @@ def test_split_column():
     er = entity_resolver(df1, df2)
     er.compare('address', columns=[['Street', 'City', 'State', 'Zip'], 'Address'])
     
-    assert all(er.related['address'].index == [0, 10])
-    assert all(er.related['address']['column'] == ['Street,City,State,Zip', 'Address'])
-    assert all(er.related['address']['address_id_exact'] == [0,0])
-    assert all(er.related['address']['address_id_similar'].isna())
-    assert all(er.related['address']['address_id'] == [0,0])
+    assert all(er.network_feature['address'].index == [0, 10])
+    assert all(er.network_feature['address']['column'] == ['Street,City,State,Zip', 'Address'])
+    assert all(er.network_feature['address']['id_exact'] == [0,0])
+    assert all(er.network_feature['address']['id_similar'].isna())
+    assert all(er.network_feature['address']['address_id'] == [0,0])
 
 def test_similar_address():
 
@@ -37,7 +37,7 @@ def test_similar_address():
     er = entity_resolver(df1, df2)
     er.compare('address', columns=['Address0', 'Address1'], threshold=0.7)
 
-    network_id, _ = er.network()
+    network_id, _, _ = er.network()
 
     actual = network_id.groupby('network_id')
     list_notna = lambda l: [x for x in l if pd.notna(x)]
@@ -79,14 +79,14 @@ def test_combine_similar_exact():
 
     expected = pd.DataFrame({
         'column': ['AddressA']*5,
-        'address_id_exact': [0,0,0,pd.NA, pd.NA],
-        'address_id_similar': [pd.NA, pd.NA, pd.NA, 0, 0],
+        'id_exact': [0,0,0,pd.NA, pd.NA],
+        'id_similar': [pd.NA, pd.NA, pd.NA, 0, 0],
         'address_id': [0]*5,
         'df_index': [0, 1, pd.NA, 0, pd.NA],
         'df2_index': [pd.NA, pd.NA, 1, pd.NA, 0]
     }, index=pd.Index([0,1,3,0,2], name='index'))
     expected['column'] = expected['column'].astype('string')
-    cols = ['address_id_exact','address_id_similar','df_index','df2_index']
+    cols = ['id_exact','id_similar','df_index','df2_index']
     expected[cols] = expected[cols].astype('Int64')
 
-    assert er.related['address'].equals(expected)
+    assert er.network_feature['address'].equals(expected)

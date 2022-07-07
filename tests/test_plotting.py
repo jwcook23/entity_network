@@ -16,6 +16,6 @@ def test_single_category():
     # compare and derive network
     er = entity_resolver(sample_df)
     er.compare('phone', columns=columns['phone'])
-    network_id, network_feature = er.network()
+    network_id, network_map, network_feature = er.network()
 
     plot_network(er.network_graph, file_name='test_single_category')

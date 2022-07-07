@@ -104,13 +104,12 @@ class entity_resolver():
         score = self.similar_feature[category][cols_score]
 
         # include exact matches
-        id_exact = f'{category}_id_exact'
-        exact = self.network_feature[category][cols_exact+[id_exact]]
-        if exact[id_exact].notna().any():
+        exact = self.network_feature[category][cols_exact+['id_exact']]
+        if exact['id_exact'].notna().any():
             list_notna = lambda l: [x for x in l if pd.notna(x)]
             list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],pd.NA)] if len(x)>0 else [(pd.NA, pd.NA)])
             # find combinations for exact match groups
-            exact = exact.groupby(id_exact)
+            exact = exact.groupby('id_exact')
             exact = exact.agg({col: list_notna for col in cols_exact})
             # expand first df combos
             exact['df_index'] = exact['df_index'].apply(list_combo)

@@ -138,5 +138,13 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         similar_feature = similar_feature.astype({'score': 'float64', 'id_similar': 'Int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'string'})
         similar_feature = similar_feature.set_index('index')
 
+    # remove features that only self-match (can occur since multiple columns may be stacked and compared)
+    remove_index = related_feature.reset_index().groupby(id_category).agg({'index': 'nunique'})
+    remove_index = remove_index[remove_index['index']==1].index
+    remove_index = related_feature.index[related_feature[id_category].isin(remove_index)]
+    related_feature = related_feature[~related_feature.index.isin(remove_index)]
+    if similar_feature is not None:
+        similar_feature = similar_feature[~similar_feature.index.isin(remove_index)]
+
     return related_feature, similar_feature
 
