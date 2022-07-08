@@ -1,7 +1,6 @@
 import sample
 
 from entity_network.entity_resolver import entity_resolver
-from entity_network.plot_network import plot_network
 
 def test_single_category():
 
@@ -18,4 +17,4 @@ def test_single_category():
     er.compare('phone', columns=columns['phone'])
     network_id, network_map, network_feature = er.network()
 
-    plot_network(er.network_graph, file_name='test_single_category')
+    er.plot_network('test_single_category')

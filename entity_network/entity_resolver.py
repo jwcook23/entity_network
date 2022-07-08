@@ -3,6 +3,9 @@ from time import time
 from itertools import combinations
 
 import pandas as pd
+import networkx as nx
+from bokeh.models import Circle, MultiLine, HoverTool
+from bokeh.plotting import figure, from_networkx, show, output_file
 
 from entity_network import _index, _prepare, _compare, _helpers
 
@@ -75,13 +78,13 @@ class entity_resolver():
 
         # add original index
         tstart = time()
-        network_id, network_map = _index.network(network_id, network_map, self._index_mask)
+        self.network_id, self.network_map = _index.network(network_id, network_map, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'network', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
 
-        return network_id, network_map, self.network_feature
+        return self.network_id, self.network_map, self.network_feature
 
 
     def index_comparison(self, category, index_df: list = None, index_df2: list = None):
@@ -213,3 +216,39 @@ class entity_resolver():
         comparison = comparison.reset_index(drop=True)
 
         return comparison
+
+    def plot_network(self, file_name):
+    # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
+    # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
+
+        # TODO: add callback during plotting if needed
+        # add node details
+        # for index in self.network_graph.nodes:
+        #     feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
+        #     self.network_graph.nodes[index].update(feature)
+        # for col in additional_details:
+        #     for index in self.network_graph.nodes:
+        #         name = {col: self._df.at[index, col]}
+        #         self.network_graph.nodes[index].update(name)
+
+        plot = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
+            x_axis_location=None, y_axis_location=None,
+            title="Graph Interaction Demo", background_fill_color="#efefef",
+        )
+        plot.grid.grid_line_color = None
+
+        # node_details = [graph.nodes[x].keys() for x in graph.nodes]
+        # node_details = set(chain(*node_details))
+        # tooltips = [(x,f'@{x}') for x in node_details]
+        # node_hover_tool = HoverTool(tooltips=tooltips)
+        # plot.add_tools(node_hover_tool)
+
+        graph_renderer = from_networkx(graph, nx.spring_layout, scale=1, center=(0, 0))
+        # graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
+        # graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
+        #                                             line_alpha=0.8, line_width=1.5)
+        # plot.renderers.append(graph_renderer)
+
+        output_file(file_name+'.html')
+
+        show(plot)
