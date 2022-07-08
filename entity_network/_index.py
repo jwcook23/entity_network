@@ -79,8 +79,6 @@ def network(df_id, df_feature, index_mask):
 
     # remove artifical create index
     df_id = df_id.set_index('index')
-    df_id.index.name = None
     df_feature = df_feature.set_index('index')
-    df_feature.index.name = None
 
     return df_id, df_feature

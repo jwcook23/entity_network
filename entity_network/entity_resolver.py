@@ -1,6 +1,6 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from time import time
-from itertools import combinations
+from itertools import combinations, chain
 
 import pandas as pd
 import networkx as nx
@@ -221,33 +221,35 @@ class entity_resolver():
     # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
     # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
 
-        # TODO: add callback during plotting if needed
-        # add node details
-        # for index in self.network_graph.nodes:
-        #     feature = self._df.loc[index, network_feature.loc[[index], 'column']].to_dict()
-        #     self.network_graph.nodes[index].update(feature)
-        # for col in additional_details:
-        #     for index in self.network_graph.nodes:
-        #         name = {col: self._df.at[index, col]}
-        #         self.network_graph.nodes[index].update(name)
+        # form nodes using unique pairwise connections
+        edges = self.network_feature['phone']['phone_id'].reset_index()
+        edges = edges.groupby('phone_id')
+        edges = edges.agg({'index': list})
+        edges = edges['index'].to_list()
+        # G = nx.from_edgelist(chain.from_iterable(combinations(e, 2) for e in edges))
+        G = nx.compose_all(map(nx.complete_graph, edges))
+        # G = nx.karate_club_graph()
+
+        # SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
+        # edge_attrs = {}
+
+        # for start_node, end_node, _ in G.edges(data=True):
+        #     edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
+        #     edge_attrs[(start_node, end_node)] = edge_color
+
+        # nx.set_edge_attributes(G, edge_attrs, "edge_color")
 
         plot = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
-            x_axis_location=None, y_axis_location=None,
-            title="Graph Interaction Demo", background_fill_color="#efefef",
-        )
+                    x_axis_location=None, y_axis_location=None, toolbar_location=None,
+                    title="Graph Interaction Demo", background_fill_color="#efefef",
+                    tooltips="index: @index, club: @club")
         plot.grid.grid_line_color = None
 
-        # node_details = [graph.nodes[x].keys() for x in graph.nodes]
-        # node_details = set(chain(*node_details))
-        # tooltips = [(x,f'@{x}') for x in node_details]
-        # node_hover_tool = HoverTool(tooltips=tooltips)
-        # plot.add_tools(node_hover_tool)
-
-        graph_renderer = from_networkx(graph, nx.spring_layout, scale=1, center=(0, 0))
-        # graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
-        # graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
-        #                                             line_alpha=0.8, line_width=1.5)
-        # plot.renderers.append(graph_renderer)
+        graph_renderer = from_networkx(G, nx.spring_layout, scale=1, center=(0, 0))
+        graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
+        graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
+                                                    line_alpha=0.8, line_width=1.5)
+        plot.renderers.append(graph_renderer)
 
         output_file(file_name+'.html')
 
