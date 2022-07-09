@@ -26,7 +26,7 @@ def combine_features(relationships, indices):
         network_map = network_map.merge(related, how='left', left_index=True, right_index=True)
         network_map[id_category] = network_map[id_category].astype('Int64')
     network_map = network_map[network_map.notna().any(axis='columns')]
-    network_map.index.name = 'index'
+    network_map.index.name = 'node'
     network_map = network_map.reset_index()
 
     return network_map
@@ -65,8 +65,8 @@ def overall_id(network_map):
     network_map['network_id'] = network_map['network_id'].astype('int64')
 
     # determine overall network id
-    network_id = network_map[['index','network_id']]
-    network_id = network_id.drop_duplicates(subset='index')
+    network_id = network_map[['node','network_id']]
+    network_id = network_id.drop_duplicates(subset='node')
 
     return network_id, network_map
 
@@ -86,11 +86,11 @@ def flatten_related():
 
 #         # aggreate values to form network
 #         feature = feature.groupby(category_id)
-#         feature = feature.agg({'index': tuple, 'column': tuple})
+#         feature = feature.agg({'node': tuple, 'column': tuple})
 
 #         # remove records that only match the same record
 #         feature = feature.loc[
-#             feature['index'].apply(lambda x: len(set(x))>1)
+#             feature['node'].apply(lambda x: len(set(x))>1)
 #         ]
 
 #         # append details for category
@@ -104,7 +104,7 @@ def flatten_related():
 # def _series_graph(network_map):
 #     '''Convert Pandas series of lists to graph.'''
 
-#     edges = network_map['index'].apply(lambda x: list(combinations(x,2)))
+#     edges = network_map['node'].apply(lambda x: list(combinations(x,2)))
 
 #     edges = edges.explode()
 #     edges = pd.DataFrame(edges.tolist(), columns=['source','target'])
@@ -114,8 +114,8 @@ def flatten_related():
 
 # def _assign_id(graph):
 
-#     df_id = pd.DataFrame({'index': list(nx.connected_components(graph))})
+#     df_id = pd.DataFrame({'node': list(nx.connected_components(graph))})
 #     df_id['network_id'] = range(0, len(df_id))
-#     df_id = df_id.explode('index')
+#     df_id = df_id.explode('node')
 
 #     return df_id

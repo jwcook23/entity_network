@@ -84,7 +84,7 @@ def test_combine_similar_exact():
         'address_id': [0]*5,
         'df_index': [0, 1, pd.NA, 0, pd.NA],
         'df2_index': [pd.NA, pd.NA, 1, pd.NA, 0]
-    }, index=pd.Index([0,1,3,0,2], name='index'))
+    }, index=pd.Index([0,1,3,0,2], name='node'))
     expected['column'] = expected['column'].astype('string')
     cols = ['id_exact','id_similar','df_index','df2_index']
     expected[cols] = expected[cols].astype('Int64')

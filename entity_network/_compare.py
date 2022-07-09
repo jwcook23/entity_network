@@ -30,7 +30,7 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
     related_feature = related_feature.groupby(related_feature)
     related_feature = related_feature.ngroup()
     related_feature = related_feature.reset_index()
-    related_feature.columns = ['index','column','id_exact']
+    related_feature.columns = ['node','column','id_exact']
     
     # compare similarity
     if threshold==1:
@@ -60,7 +60,7 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         tfidf = vectorizer.fit_transform(unique.to_list())
 
         # create TF-IDF index relation to original data index
-        tfidf_index = unique.index.to_frame(index=False, name=['index','column'])
+        tfidf_index = unique.index.to_frame(index=False, name=['node','column'])
         tfidf_index.name = 'tfidf_index'
 
         # initialize non-metric space libary for sparse matrix searching
@@ -102,24 +102,24 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         similar_feature['threshold'] = similar_feature['score']>=threshold
 
         # place most similar_feature values first for first dataframe
-        similar_feature = similar_feature.sort_values(by=['index', 'score'], ascending=[True, False])
+        similar_feature = similar_feature.sort_values(by=['node', 'score'], ascending=[True, False])
 
         # assign id to similarly connected components
-        connected = nx.from_pandas_edgelist(similar_feature[similar_feature['threshold']], source='index', target='index_similar')
-        connected = pd.DataFrame({'index': list(nx.connected_components(connected))})
+        connected = nx.from_pandas_edgelist(similar_feature[similar_feature['threshold']], source='node', target='node_similar')
+        connected = pd.DataFrame({'node': list(nx.connected_components(connected))})
         connected.index.name = 'id_similar'
-        connected = connected.explode('index').reset_index()
+        connected = connected.explode('node').reset_index()
         connected['threshold'] = True
-        similar_feature = similar_feature.merge(connected, on=['index','threshold'], how='left')
+        similar_feature = similar_feature.merge(connected, on=['node','threshold'], how='left')
         similar_feature['id_similar'] = similar_feature['id_similar'].astype('Int64')
 
         # add similar_feature into exact matches
-        related_feature = pd.concat([related_feature, similar_feature.loc[similar_feature['threshold'], ['index','column','id_similar']]], ignore_index=True)
+        related_feature = pd.concat([related_feature, similar_feature.loc[similar_feature['threshold'], ['node','column','id_similar']]], ignore_index=True)
         related_feature[['id_exact','id_similar']] = related_feature[['id_exact','id_similar']].astype('Int64')
 
         # develop an overall id
         related_feature['temp_id'] = related_feature.groupby(['id_exact','id_similar'], dropna=False).ngroup()
-        combine = related_feature.groupby('index')
+        combine = related_feature.groupby('node')
         combine = combine.agg({'temp_id': list})
         combine[id_category] = combine['temp_id'].apply(lambda x: x[0])
         combine = combine.explode('temp_id')
@@ -130,17 +130,17 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
     # format final return data types
     # TODO: change data types earlier
     related_feature = _index.original(related_feature, index_mask)
-    related_feature = related_feature.astype({'index': 'int64', 'column': 'string', 'id_exact': 'Int64', 'id_similar': 'Int64', id_category: 'int64'})
-    related_feature = related_feature.set_index('index')
+    related_feature = related_feature.astype({'node': 'int64', 'column': 'string', 'id_exact': 'Int64', 'id_similar': 'Int64', id_category: 'int64'})
+    related_feature = related_feature.set_index('node')
     if similar_feature is not None:
         similar_feature = _index.original(similar_feature, index_mask)
-        similar_feature = _index.original(similar_feature, index_mask, index_name='index_similar')
-        similar_feature = similar_feature.astype({'score': 'float64', 'id_similar': 'Int64', 'index': 'int64', 'column': 'string', 'index_similar': 'int64', 'column_similar': 'string'})
-        similar_feature = similar_feature.set_index('index')
+        similar_feature = _index.original(similar_feature, index_mask, index_name='node_similar')
+        similar_feature = similar_feature.astype({'score': 'float64', 'id_similar': 'Int64', 'node': 'int64', 'column': 'string', 'node_similar': 'int64', 'column_similar': 'string'})
+        similar_feature = similar_feature.set_index('node')
 
     # remove features that only self-match (can occur since multiple columns may be stacked and compared)
-    remove_index = related_feature.reset_index().groupby(id_category).agg({'index': 'nunique'})
-    remove_index = remove_index[remove_index['index']==1].index
+    remove_index = related_feature.reset_index().groupby(id_category).agg({'node': 'nunique'})
+    remove_index = remove_index[remove_index['node']==1].index
     remove_index = related_feature.index[related_feature[id_category].isin(remove_index)]
     related_feature = related_feature[~related_feature.index.isin(remove_index)]
     if similar_feature is not None:

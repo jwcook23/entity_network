@@ -42,7 +42,7 @@ class entity_resolver():
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # set sources for tracability when comparing multiple categories
-        self.processed[category].index.names = ('index', 'column')
+        self.processed[category].index.names = ('node', 'column')
         self.processed[category].name = category
 
         # ignore values the processor completely removed
@@ -222,25 +222,25 @@ class entity_resolver():
     # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
 
         # form nodes using unique pairwise connections
-        edges = self.network_feature['phone']['phone_id'].reset_index()
-        edges = edges.groupby('phone_id')
-        edges = edges.agg({'index': list})
-        edges = edges['index'].to_list()
+        edges = self.network_id.reset_index()
+        edges = edges.groupby('network_id')
+        edges = edges.agg({'node': list})
+        edges = edges['node'].to_list()
         # G = nx.from_edgelist(chain.from_iterable(combinations(e, 2) for e in edges))
         G = nx.compose_all(map(nx.complete_graph, edges))
         # G = nx.karate_club_graph()
 
         # SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
-        # edge_attrs = {}
+        edge_attrs = {}
 
-        # for start_node, end_node, _ in G.edges(data=True):
-        #     edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
-        #     edge_attrs[(start_node, end_node)] = edge_color
+        for start_node, end_node, _ in G.edges(data=True):
+            # edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
+            edge_attrs[(start_node, end_node)] = "black"
 
-        # nx.set_edge_attributes(G, edge_attrs, "edge_color")
+        nx.set_edge_attributes(G, edge_attrs, "edge_color")
 
-        plot = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
-                    x_axis_location=None, y_axis_location=None, toolbar_location=None,
+        plot = figure(width=800, height=600, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
+                    x_axis_location=None, y_axis_location=None,
                     title="Graph Interaction Demo", background_fill_color="#efefef",
                     tooltips="index: @index, club: @club")
         plot.grid.grid_line_color = None
