@@ -21,13 +21,13 @@ def combine_features(relationships, indices):
 def overall_id(network_map):
     
     # assume an initial temp id to find connected components of
+    id_cols = network_map.columns[network_map.columns.str.endswith('_id')]
     network_map['temp_id'] = range(0, len(network_map))
 
     # form list of lists sparse matrix incrementally of connected nodes
     n = len(network_map)
     graph = lil_matrix((n, n), dtype=int)
-    columns = network_map.columns[network_map.columns.str.endswith('_id')]
-    for col in columns:
+    for col in id_cols:
         indices = network_map.groupby(col)
         indices = indices.agg({'temp_id': list})
         indices = indices['temp_id']
