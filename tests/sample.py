@@ -7,7 +7,7 @@ from faker import Faker
 
 
 fake = Faker(locale='en_US')
-
+Faker.seed(42)
 
 def unique_records(n_unique):
 

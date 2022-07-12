@@ -17,7 +17,7 @@ class entity_resolver():
         self._df, self._index_mask = _index.unique(df, df2)
 
         self.network_feature = {}
-        self.similar_feature = {}
+        self.similar_score = {}
         # self.network_map = None
         # self.network_id = None
         # self.entity_feature = None
@@ -51,7 +51,7 @@ class entity_resolver():
         # compare values on similarity threshold
         print(f'comparing {columns}')
         tstart = time()
-        self.network_feature[category], self.similar_feature[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
+        self.network_feature[category], self.similar_score[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # add original index to processed values

@@ -1,20 +1,7 @@
-from itertools import combinations
-
 import pandas as pd
-import numpy as np
-import networkx as nx
 
-# def assign_group(relationships, indices):
-
-#     # network_map = _common_features(relationships)
-#     # graph = _series_graph(network_map)
-#     # df_id = _assign_id(graph)
-
-#     network_map = _combine_features(relationships, indices)
-#     network_map = _row_connected(network_map)
-#     df_id = _unique_id(network_map)
-
-#     return df_id, network_map
+from scipy.sparse import lil_matrix
+from scipy.sparse.csgraph import connected_components
 
 def combine_features(relationships, indices):
     '''Combine records with matching feature ids.'''
@@ -32,37 +19,28 @@ def combine_features(relationships, indices):
     return network_map
 
 def overall_id(network_map):
-    '''Assign a group_id to rows sharing a common column value.'''
     
-    # extract values for numpy comparison
+    # assume an initial temp id to find connected components of
+    network_map['temp_id'] = range(0, len(network_map))
+
+    # form list of lists sparse matrix incrementally of connected nodes
+    n = len(network_map)
+    graph = lil_matrix((n, n), dtype=int)
     columns = network_map.columns[network_map.columns.str.endswith('_id')]
-    values = network_map[columns].to_numpy(na_value=np.nan)
-    values = np.vstack(values[:, :]).astype(np.float)
+    for col in columns:
+        indices = network_map.groupby(col)
+        indices = indices.agg({'temp_id': list})
+        indices = indices['temp_id']
+        for idx in indices:
+            graph[idx[0], idx] = 1
+    
+    # convert to compressed sparse row matrix for better computation
+    graph = graph.tocsr()
 
-    # compare the difference of all elements
-    matches = (values[:,None]-values)==0
-    # find matches in other rows (each row corresponds to the row in A, each column is the comparison to other rows in A)
-    matches = matches.any(axis=2)
-
-    # find indices of match groups
-    groups = np.argwhere(matches)
-    # remove self matches in groups
-    groups = groups[groups[:,0]!=groups[:,1]]
-    # remove duplicates in groups
-    groups.sort(axis=1)
-    groups = np.unique(groups, axis=0)
-
-    # assign the same group id to row groups
-    group_id = np.arange(values.shape[0])
-    for row_pair in groups:
-        row0 = row_pair[0]
-        row1 = row_pair[1]
-        assign = np.flatnonzero(group_id==group_id[row1])
-        group_id[assign] = group_id[row0]
-
-    # assign id to input df
-    network_map['network_id'] = group_id
-    network_map['network_id'] = network_map['network_id'].astype('int64')
+    # determine connected temp_ids to assign an overall network_id
+    _, labels = connected_components(graph, directed=False, return_labels=True)
+    network_map['network_id'] = labels
+    network_map = network_map.drop(columns='temp_id')
 
     # determine overall network id
     network_id = network_map[['node','network_id']]
@@ -70,10 +48,44 @@ def overall_id(network_map):
 
     return network_id, network_map
 
+# def overall_id(network_map):
+#     '''Assign a group_id to rows sharing a common column value.'''
+    
+#     # extract values for numpy comparison
+#     columns = network_map.columns[network_map.columns.str.endswith('_id')]
+#     values = network_map[columns].to_numpy(na_value=np.nan)
+#     values = np.vstack(values[:, :]).astype(np.float)
 
-def flatten_related():
+#     # compare the difference of all elements
+#     matches = (values[:,None]-values)==0
+#     # find matches in other rows (each row corresponds to the row in A, each column is the comparison to other rows in A)
+#     matches = matches.any(axis=2)
 
-    pass
+#     # find indices of match groups
+#     groups = np.argwhere(matches)
+#     # remove self matches in groups
+#     groups = groups[groups[:,0]!=groups[:,1]]
+#     # remove duplicates in groups
+#     groups.sort(axis=1)
+#     groups = np.unique(groups, axis=0)
+
+#     # assign the same group id to row groups
+#     group_id = np.arange(values.shape[0])
+#     for row_pair in groups:
+#         row0 = row_pair[0]
+#         row1 = row_pair[1]
+#         assign = np.flatnonzero(group_id==group_id[row1])
+#         group_id[assign] = group_id[row0]
+
+#     # assign id to input df
+#     network_map['network_id'] = group_id
+#     network_map['network_id'] = network_map['network_id'].astype('int64')
+
+#     # determine overall network id
+#     network_id = network_map[['node','network_id']]
+#     network_id = network_id.drop_duplicates(subset='node')
+
+#     return network_id, network_map
 
 
 # def _common_features(relationships):
