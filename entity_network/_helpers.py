@@ -25,6 +25,7 @@ def overall_id(network_map):
     network_map['temp_id'] = range(0, len(network_map))
 
     # form list of lists sparse matrix incrementally of connected nodes
+    # TODO: form this sparse matrix during initial comparison to increase performance
     n = len(network_map)
     graph = lil_matrix((n, n), dtype=int)
     for col in id_cols:

@@ -3,6 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import nmslib
 from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
+import usaddress
 
 from entity_network import _index, _exceptions
 
@@ -97,6 +98,9 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
         similar_score['tfidf_similar'] = similar_score['tfidf_similar'].astype('int64')
         similar_score['score'] = similar_score['score'].astype('float64')
         similar_score['score'] = similar_score['score']*-1
+        similar_score['threshold'] = similar_score['score']>=threshold
+        similar_score = similar_score.merge(similar_feature[['column','id_similar']], left_on='tfidf_similar', right_index=True)
+        similar_score = similar_score.sort_values(by=['id_similar', 'score'], ascending=[True,False])
 
         # convert similar_score indexing from tfidf back to original
         similar_score.index = similar_feature.loc[similar_score.index,'node']
@@ -143,3 +147,23 @@ def match(category, values, kneighbors, threshold, text_comparer, index_mask):
 
     return related_feature, similar_score
 
+def address(values):
+
+    values = values.dropna()
+
+    # parse address components
+    components0,_ = usaddress.tag(values[0])
+    components0 = set(components0.items())
+
+    components1,_ = usaddress.tag(values[1])
+    components1 = set(components1.items())
+
+    # determine difference in address components
+    diff0 = components0-components1
+    if len(diff0)==0:
+        diff0 = None
+    diff1 = components1-components0
+    if len(diff1)==0:
+        diff1 = None
+
+    return diff0, diff1

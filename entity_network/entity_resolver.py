@@ -87,135 +87,62 @@ class entity_resolver():
         return self.network_id, self.network_map, self.network_feature
 
 
-    def index_comparison(self, category, index_df: list = None, index_df2: list = None):
+    def debug_similar(self, category, cluster_edge=None):
+        
+        comparer = {'address': _compare.address}
 
-        # check if class initialized with one or two dataframes
-        two_dfs = self._index_mask['df2'] is not None
+        # extra debugging info for given category
+        similar = self.similar_score[category]
 
-        # define columns based on number of initialized dataframes
-        if two_dfs:
-            cols_processed = ['df_index','df2_index',category]
-            cols_score = ['df_index', 'df_index_similar', 'df2_index','df2_index_similar', 'score']
-            cols_exact = ['df_index', 'df2_index']
-        else:
-            cols_processed = ['df_index', category]
-            cols_score = ['df_index', 'df_index_similar', 'score']
-            cols_exact = ['df_index']
-
-        # select processed text and similarity score for category
-        processed = self.processed[category][cols_processed]
-        score = self.similar_feature[category][cols_score]
-
-        # include exact matches
-        exact = self.network_feature[category][cols_exact+['id_exact']]
-        if exact['id_exact'].notna().any():
-            list_notna = lambda l: [x for x in l if pd.notna(x)]
-            list_combo = lambda x: list(combinations(x,2)) if len(x)>1 else ([(x[0],pd.NA)] if len(x)>0 else [(pd.NA, pd.NA)])
-            # find combinations for exact match groups
-            exact = exact.groupby('id_exact')
-            exact = exact.agg({col: list_notna for col in cols_exact})
-            # expand first df combos
-            exact['df_index'] = exact['df_index'].apply(list_combo)
-            exact = exact.explode('df_index')
-            exact[['df_index','df_index_similar']] = exact['df_index'].to_list()
-            exact[['df_index','df_index_similar']] = exact[['df_index','df_index_similar']].astype('Int64')
-            # expand second df combos
-            if two_dfs:
-                exact['df2_index'] = exact['df2_index'].apply(list_combo)
-                exact = exact.explode('df2_index')
-                exact[['df2_index','df2_index_similar']] = exact['df2_index'].to_list()
-                exact[['df2_index','df2_index_similar']] = exact[['df2_index','df2_index_similar']].astype('Int64')
-            # add exact values
-            score = pd.concat([score, exact])
-            score['score'] = score['score'].fillna(1.0)
-            # include related similarity for exact matches between two dataframes
-            if two_dfs:
-                related = exact[['df_index','df2_index','df2_index_similar']]
-                related = related.rename(columns={'df_index': 'df_index_similar'})
-                related = related.merge(score.drop(columns=['df2_index','df2_index_similar']), on='df_index_similar')
-                related['df_index_similar'] = pd.NA
-                related['df_index_similar'] = related['df_index_similar'].astype('Int64')
-                score = pd.concat([score, related], ignore_index=True)
-
-                related = exact[['df_index','df_index_similar']]
-                related = related.merge(score[score['score']<1.0].drop(columns='df_index_similar'), on='df_index')
-                related['df_index'] = pd.NA
-                related['df_index'] = related['df_index'].astype('Int64')
-                score = pd.concat([score, related], ignore_index=True)
-
-
-        # error check index inputs
-        if index_df is not None:
-            check = pd.Series(index_df)
-            missing = ~check.isin(processed['df_index'])
-            if any(missing):
-                raise RuntimeError(f'index_df provided is not a valid index: {list(check[missing])}')
-        if index_df2 is not None:
-            check = pd.Series(index_df2)
-            missing = ~check.isin(processed['df2_index'])
-            if any(missing):
-                raise RuntimeError(f'index_df2 provided is not a valid index: {list(check[missing])}')
-
-        # select indices by parameters given
-        if index_df is not None and index_df2 is not None:
-            comparison = score[
-                (score['df_index'].isin(index_df) | score['df_index_similar'].isin(index_df)) &
-                (score['df2_index'].isin(index_df2) | score['df2_index_similar'].isin(index_df2))
-            ]
-        elif index_df is not None:
-            comparison = score[score['df_index'].isin(index_df) | score['df_index_similar'].isin(index_df)]
-        elif index_df2 is not None:
-            comparison = score[score['df2_index'].isin(index_df2) | score['df2_index_similar'].isin(index_df2)]
-
-        # remove mirrored matches where other_index, tfidf_index is the reverse of tfidf_index, other_index
-        first = ~comparison[['df_index','df_index_similar']].apply(frozenset, axis=1).duplicated() 
-        comparison = comparison[first]
-
-        # add processed values compared for df_index, df_index_similar
-        values = processed[['df_index', category]].dropna(subset='df_index')
-        comparison = comparison.merge(
-            values.rename(columns={category: f'df_{category}'}),
+        # add processed values into similar score for the first dataframe
+        df_categories = {'exact': f'df_{category}', 'similar': f'df_{category}_similar'}
+        processed = self.processed[category][['df_index', category]].dropna(subset='df_index')
+        similar = similar.merge(
+            processed.rename(columns={category: df_categories['exact']}), 
             on='df_index', how='left'
         )
-        comparison = comparison.merge(
-            values.rename(columns={'df_index': 'df_index_similar', category: f'df_{category}_similar'}),
-            on='df_index_similar', how='left'
+        similar = similar.merge(
+            processed.rename(columns={category: df_categories['similar'], 'df_index': 'df_index_similar'}),
+            on='df_index_similar', how='left',
         )
-        # add processed values compared for df2_index, df2_index_similar
-        if two_dfs:
-            values = processed[['df2_index', category]].dropna(subset='df2_index')
-            comparison = comparison.merge(
-                values.rename(columns={category: f'df2_{category}'}),
+        # add processed values into similar score for the second dataframe 
+        if self._index_mask['df2'] is None:
+            df2_categories = {'exact': None, 'similar': None}
+        else:
+            df2_categories = {'exact': f'df2_{category}', 'similar': f'df2_{category}_similar'}
+            processed = self.processed[category][['df2_index',category]].dropna(subset='df2_index')
+            similar = similar.merge(
+                processed[['df2_index',category]].dropna().rename(columns={category: df2_categories['exact']}), 
                 on='df2_index', how='left'
             )
-            comparison = comparison.merge(
-                values.rename(columns={'df2_index': 'df2_index_similar', category: f'df2_{category}_similar'}),
-                on='df2_index_similar', how='left'
+            similar = similar.merge(
+                processed.dropna().rename(columns={category: df2_categories['similar'], 'df2_index': 'df2_index_similar'}),
+                on='df2_index_similar', how='left',
             )
 
-        # # add similar values from first df
-        # similar = processed[['df_index', category]]
-        # similar = similar.dropna(subset='df_index')
-        # similar = similar.rename(columns={'df_index': 'df_index_similar'})
-        # comparison = comparison.merge(similar, on='df_index_similar', suffixes=('','_df_similar'), how='left')
+        # determine differences between similar values
+        # TODO: provide a summary of differences
+        columns = list(df_categories.values())+list(df2_categories.values())
+        columns = [x for x in columns if x is not None]
+        similar[f'{category}_difference'] = similar[columns].apply(comparer[category], axis=1)
 
-        # # add similar values from second df
-        # if two_dfs:
-        #     similar = processed[['df2_index', category]]
-        #     similar = similar.dropna(subset='df2_index')
-        #     similar = similar.rename(columns={'df2_index': 'df2_index_similar'})
-        #     comparison = comparison.merge(similar, on='df2_index_similar', suffixes=('','_df2_similar'), how='left')
+        # keep last value in cluster and/or first value out of cluster
+        similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
+        if cluster_edge=='both':
+            similar = pd.concat([
+                similar[similar['threshold']].drop_duplicates(subset='id_similar', keep='last'),
+                similar[~similar['threshold']].drop_duplicates(subset='id_similar', keep='first')
+            ])
+        elif cluster_edge=='in':
+            similar = similar[similar['threshold']].drop_duplicates(subset='id_similar', keep='last')
+        elif cluster_edge=='out':
+            similar = similar[~similar['threshold']].drop_duplicates(subset='id_similar', keep='first')
+        similar = similar.reset_index(drop=True)
 
-        # sort by first appearing index
-        if index_df2 is not None:
-            comparison = comparison.sort_values('df2_index')
-        else:
-            comparison = comparison.sort_values('df_index')
+        # assure sort by id and score
+        similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
 
-        # for equality testing, reset index that doesn't carry meaning
-        comparison = comparison.reset_index(drop=True)
-
-        return comparison
+        return similar
 
     def plot_network(self, file_name):
     # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
