@@ -31,7 +31,7 @@ def test_address_one_df(df_samples):
     er = entity_resolver(df_samples[0])
     er.compare('address', columns='Address0', threshold=threshold)
 
-    similar = er.debug_similar('address')
+    similar, in_cluster, out_cluster = er.debug_similar('address')
 
     assert similar.columns.equals(pd.Index([
         'score', 'threshold', 'column', 'id_similar',
@@ -60,6 +60,9 @@ def test_address_one_df(df_samples):
         '1111 e amy falls mission reedmouth nv 56583'
     ], dtype='string'))
 
+    assert len(in_cluster)==2
+    assert len(out_cluster)==4
+
 
 def test_address_two_df(df_samples):
 
@@ -67,7 +70,7 @@ def test_address_two_df(df_samples):
     er = entity_resolver(df_samples[0], df_samples[1])
     er.compare('address', columns=['Address0','Address1'], threshold=threshold)
 
-    similar = er.debug_similar('address')
+    similar, in_cluster, out_cluster = er.debug_similar('address')
 
     assert similar.columns.equals(pd.Index([
         'score', 'threshold', 'column', 'id_similar', 
@@ -83,38 +86,5 @@ def test_address_two_df(df_samples):
     assert similar['df_index_similar'].equals(pd.Series([2,0,0,2,1,1,3,pd.NA], dtype='Int64'))
     assert similar['df2_index_similar'].equals(pd.Series([pd.NA,pd.NA,pd.NA,pd.NA,pd.NA,pd.NA,pd.NA,1], dtype='Int64'))
 
-
-def test_cluster_edge_both(df_samples):
-
-    threshold = 0.7
-    er = entity_resolver(df_samples[0])
-    er.compare('address', columns='Address0', threshold=threshold)
-
-    similar = er.debug_similar('address', cluster_edge='both')
-
-    assert similar['df_index'].equals(pd.Series([2,1,0], dtype='Int64'))
-    assert similar['df_index_similar'].equals(pd.Series([0,0,1], dtype='Int64'))
-
-
-def test_cluster_edge_in(df_samples):
-
-    threshold = 0.7
-    er = entity_resolver(df_samples[0])
-    er.compare('address', columns='Address0', threshold=threshold)
-
-    similar = er.debug_similar('address', cluster_edge='in')
-
-    assert similar['df_index'].equals(pd.Series([2], dtype='Int64'))
-    assert similar['df_index_similar'].equals(pd.Series([0], dtype='Int64'))
-
-
-def test_cluster_edge_out(df_samples):
-
-    threshold = 0.7
-    er = entity_resolver(df_samples[0])
-    er.compare('address', columns='Address0', threshold=threshold)
-
-    similar = er.debug_similar('address', cluster_edge='out')
-
-    assert similar['df_index'].equals(pd.Series([1,0], dtype='Int64'))
-    assert similar['df_index_similar'].equals(pd.Series([0,1], dtype='Int64'))
+    assert len(in_cluster)==2
+    assert len(out_cluster)==6

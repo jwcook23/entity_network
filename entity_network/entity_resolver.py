@@ -87,7 +87,7 @@ class entity_resolver():
         return self.network_id, self.network_map, self.network_feature
 
 
-    def debug_similar(self, category, cluster_edge=None):
+    def debug_similar(self, category):
         
         comparer = {'address': _compare.address}
 
@@ -126,23 +126,14 @@ class entity_resolver():
         columns = [x for x in columns if x is not None]
         similar[f'{category}_difference'] = similar[columns].apply(comparer[category], axis=1)
 
-        # keep last value in cluster and/or first value out of cluster
-        similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
-        if cluster_edge=='both':
-            similar = pd.concat([
-                similar[similar['threshold']].drop_duplicates(subset='id_similar', keep='last'),
-                similar[~similar['threshold']].drop_duplicates(subset='id_similar', keep='first')
-            ])
-        elif cluster_edge=='in':
-            similar = similar[similar['threshold']].drop_duplicates(subset='id_similar', keep='last')
-        elif cluster_edge=='out':
-            similar = similar[~similar['threshold']].drop_duplicates(subset='id_similar', keep='first')
-        similar = similar.reset_index(drop=True)
-
-        # assure sort by id and score
+        # group by id and score
         similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
 
-        return similar
+        # split by in/out of cluster with closest distance to cluster edge appearing first
+        in_cluster = similar[similar['threshold']].sort_values(by='score', ascending=True)
+        out_cluster = similar[~similar['threshold']].sort_values(by='score', ascending=False)
+
+        return similar, in_cluster, out_cluster
 
     def plot_network(self, file_name):
     # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
