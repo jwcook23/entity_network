@@ -24,25 +24,39 @@ def unique(df, df2):
     if df2 is not None and df2.index.has_duplicates:
         raise _exceptions.DuplicatedIndex('Argument df2 index must be unique.')
 
-    # develop unique integer based index for each df in case they need to be combined
+    # form a single dataframe container
+    dfs = {'df': df, 'df2': df2}
+
+    # develop unique integer based index
     index_mask = {
         'df': pd.Series(df.index, index=range(0, len(df))),
         'df2': None
     }
     index_mask['df'].name = 'df_index'
-    df = df.copy()
-    df.index = index_mask['df'].index
+    dfs['df'].index = index_mask['df'].index
+    dfs['df'].index.name = 'node'
+    
+    # set index of df2 starting at end of df 
     if df2 is not None:
-        # start df2 index at end of df index
         seed = len(index_mask['df'])
         index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
         index_mask['df2'].name = 'df2_index'
-        df2 = df2.copy()
-        df2.index = index_mask['df2'].index
-        # stack df2 on each of df for a single df to be compared
-        df = pd.concat([df, df2])
+        dfs['df2'].index = index_mask['df2'].index
+        dfs['df2'].index.name = 'node'
 
-    return df, index_mask
+    # df = df.copy()
+    # df.index = index_mask['df'].index
+    # if df2 is not None:
+    #     # start df2 index at end of df index
+    #     seed = len(index_mask['df'])
+    #     index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
+    #     index_mask['df2'].name = 'df2_index'
+    #     df2 = df2.copy()
+    #     df2.index = index_mask['df2'].index
+    #     # stack df2 on each of df for a single df to be compared
+    #     df = pd.concat([df, df2])
+
+    return dfs
 
 
 def original(reindexed, index_mask, index_name = 'node'):

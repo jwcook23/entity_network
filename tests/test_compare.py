@@ -17,7 +17,8 @@ def test_split_column():
     })
 
     er = entity_resolver(df1, df2)
-    er.compare('address', columns=[['Street', 'City', 'State', 'Zip'], 'Address'])
+    columns = {'df': [['Street', 'City', 'State', 'Zip']], 'df2': 'Address'}
+    er.compare('address', columns=columns)
     
     assert all(er.network_feature['address'].index == [0, 10])
     assert all(er.network_feature['address']['column'] == ['Street,City,State,Zip', 'Address'])
@@ -31,11 +32,11 @@ def test_similar_address():
 
     df = pd.read_csv(file_path)
     df = df[df['threshold=0.7']==1]
-    df1 = df[['Address0']]
-    df2 = df[['Address1']]
+    df1 = df[['Address0']].head(15)
+    df2 = df[['Address1']].head(6)
 
     er = entity_resolver(df1, df2)
-    er.compare('address', columns=['Address0', 'Address1'], threshold=0.7)
+    er.compare('address', columns={'df': 'Address0', 'df2': 'Address1'}, threshold=0.7)
 
     network_id, _, _ = er.network()
 

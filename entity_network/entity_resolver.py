@@ -14,7 +14,7 @@ class entity_resolver():
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
 
-        self._df, self._index_mask = _index.unique(df, df2)
+        self._df = _index.unique(df, df2)
 
         self.network_feature = {}
         self.similar_score = {}
@@ -44,12 +44,14 @@ class entity_resolver():
         if text_cleaner is not None:
             print(f'Cleaning category for comparison: {category}.')
             tstart = time()
-            self.processed[category] = _prepare.clean(self.processed[category], category, text_cleaner)
+            for frame, values in self.processed[category].items():
+                self.processed[category][frame] = _prepare.clean(values, category, text_cleaner)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # set sources for tracability when comparing multiple categories
-        self.processed[category].index.names = ('node', 'column')
-        self.processed[category].name = category
+        for frame, values in self.processed[category].items():
+            self.processed[category][frame].index.names = ('node', 'column')
+            self.processed[category][frame].name = category
 
         # ignore values the processor completely removed
         # self.processed[category] = self.processed[category].dropna()
@@ -73,19 +75,19 @@ class entity_resolver():
             related_feature[id_category] = related_feature['id_exact']
             similar_score = None
         else:
-            print(f'Finding tfidf for category: {category}.')
+            print(f'Creating tfidf for category: {category}.')
             tstart = time()
-            tfidf, similar_feature = _compare.create_tfidf(category, self.processed[category], text_comparer)
+            tfidf, tfidf_index = _compare.create_tfidf(category, self.processed[category], text_comparer)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'create_tfidf', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Finding similar matches for category: {category}.')
             tstart = time()
-            similar_score = _compare.similar_match(tfidf, kneighbors)
+            similar_score = _compare.similar_match(tfidf, tfidf_index, kneighbors)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'similar_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Assigning a similar ID for category: {category}.')
             tstart = time()
-            similar_feature = _compare.similar_id(similar_score, similar_feature, threshold)
+            similar_feature = _compare.similar_id(similar_score, tfidf_index, threshold)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'similar_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Preparing similarity score for category: {category}.')

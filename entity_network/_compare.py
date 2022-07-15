@@ -17,6 +17,16 @@ default_text_comparer = {
 
 def exact_match(values):
 
+    # compare values present in both dfs if two are given
+    if values['df2'] is None:
+        values = values['df']
+    else:
+        values = pd.concat([
+            values['df'][values['df'].isin(values['df2'])], 
+            values['df2'][values['df2'].isin(values['df'])]
+        ])
+
+    # label exact matches with an id
     related_feature = values[values.duplicated(keep=False) & values.notna()]
     related_feature = related_feature.groupby(related_feature)
     related_feature = related_feature.ngroup()
@@ -27,12 +37,10 @@ def exact_match(values):
 
 def create_tfidf(category, values, text_comparer):
 
-    # remove duplicates to lower computations needed for similar_feature matching
-    unique = values.drop_duplicates()
+    tfidf = {'df': None, 'df2': None}
+    tfidf_index = {'df': None, 'df2': None}
 
-    # remove missing values that were completely removed during preprocessing
-    unique = unique.dropna()
-
+    # define vectorizer to transform text to numbers
     if text_comparer=='default':
         text_comparer = default_text_comparer[category]
     vectorizer = TfidfVectorizer(
@@ -45,65 +53,109 @@ def create_tfidf(category, values, text_comparer):
         # removed during preprocessing
         stop_words=None
     )
-    tfidf = vectorizer.fit_transform(unique.to_list())
 
-    # create TF-IDF index relation to original data index
-    similar_feature = unique.index.to_frame(index=False, name=['node','column'])
-    similar_feature.name = 'tfidf_index'
+    for frame, data in values.items():
+        # skip df2 if not provided
+        if data is None:
+            continue
+        # remove duplicates to lower computations needed for similar_feature matching
+        unique = data.drop_duplicates()
+        # remove missing values that were completely removed during preprocessing
+        unique = unique.dropna()
+        # transform text to tfidf
+        if frame=='df':
+            tfidf[frame] = vectorizer.fit_transform(unique.to_list())
+        else:
+            tfidf[frame] = vectorizer.transform(unique.to_list())
+        # create TF-IDF index relation to original data index
+        tfidf_index[frame] = unique.index.to_frame(index=False, name=['node','column'])
+        tfidf_index[frame].index.name = 'tfidf_index'
 
-    return tfidf, similar_feature
+    return tfidf, tfidf_index
 
-def similar_match(tfidf, kneighbors):
+def similar_match(tfidf, tfidf_index, kneighbors):
 
     # initialize non-metric space libary for sparse matrix searching
     index = nmslib.init(method='simple_invindx', space='negdotprod_sparse_fast', data_type=nmslib.DataType.SPARSE_VECTOR) 
-    index.addDataPointBatch(tfidf)
+    index.addDataPointBatch(tfidf['df'])
     index.createIndex()
 
     # find similar features matching above
     # TODO: ignore first half since it will be repeated information?
-    similar_score = index.knnQueryBatch(tfidf, k=kneighbors, num_threads=4)
+    if tfidf['df2'] is None:
+        # find similar values for the first df in the first df
+        neighbors = index.knnQueryBatch(tfidf['df'], k=kneighbors, num_threads=4)
+    else:
+        # find similar vlaues for the first df in the second df
+        neighbors = index.knnQueryBatch(tfidf['df2'], k=kneighbors, num_threads=4)
+
+    # replace tfidf_index with node index
+    similar_score = {}
+    for idx, comparison in enumerate(neighbors):
+        # lookup node index in the second (smaller) dataframe
+        node_source = tfidf_index['df2'].at[idx, 'node']
+        # lookup node index in the first (larger) dataframe
+        node_target = tfidf_index['df'].loc[comparison[0], 'node'].values
+        # adjust score for negative dot product
+        score = comparison[1]*-1
+        # assign values using the first dataframe as the main dataframe
+        similar_score[node_source] =  [node_target, score]
 
     return similar_score
 
-def similar_id(similar_score, similar_feature, threshold):
+def similar_id(similar_score, tfidf_index, threshold):
 
-    # assign a group id based on connected components above threshold
-    n = similar_feature.index.max()+1
+    # determine node size needed
+    if tfidf_index['df2'] is None:
+        n = tfidf_index['df']['node'].max()
+    else:
+        n = tfidf_index['df2']['node'].max()
+    
     # form list of lists sparse matrix incrementally
     graph = lil_matrix((n, n), dtype=int)
-    for comparison in similar_score:
-        # invert score for negative dot product
-        score = comparison[1]*-1
+    for node_source, comparison in similar_score.items():
         # assign matrix values that meet threshold
-        idx = comparison[0][score>=threshold]
-        graph[idx[0], idx] = 1
+        node_target = comparison[0][comparison[1]>=threshold]
+        graph[node_source, node_target] = 1
     # convert to compressed sparse row matrix for better computation
     graph = graph.tocsr()
+
     # find connected components to assign an id
     _, labels = connected_components(graph, directed=False, return_labels=True)
-    similar_feature['id_similar'] = labels
+    similar_feature = pd.DataFrame({
+        'node': range(0, n),
+        'id_similar': labels
+    })
+
+    # return ids for the main dataframe only
+    similar_feature = similar_feature[similar_feature['node'].isin(tfidf_index['df']['node'])]
 
     return similar_feature
 
 
 def expand_score(similar_score, similar_feature, threshold):
 
-    similar_score = pd.DataFrame(similar_score, columns=['tfidf_similar','score'], index=similar_feature.index)
-    similar_score.index.name = 'tfidf_index'
+    # convert from dictionary to dataframe
+    similar_score = pd.DataFrame.from_dict(similar_score, orient='index', columns=['node_similar', 'score'])
+    similar_score.index.name = 'node'
     similar_score = similar_score.apply(pd.Series.explode)
-    similar_score = similar_score[similar_score.index!=similar_score['tfidf_similar']]
-    similar_score['tfidf_similar'] = similar_score['tfidf_similar'].astype('int64')
+    similar_score['node_similar'] = similar_score['node_similar'].astype('int64')
     similar_score['score'] = similar_score['score'].astype('float64')
-    similar_score['score'] = similar_score['score']*-1
-    similar_score['threshold'] = similar_score['score']>=threshold
-    similar_score = similar_score.merge(similar_feature[['column','id_similar']], left_on='tfidf_similar', right_index=True)
-    similar_score = similar_score.sort_values(by=['id_similar', 'score'], ascending=[True,False])
 
-    # convert similar_score indexing from tfidf back to original
-    similar_score.index = similar_feature.loc[similar_score.index,'node']
-    similar_score['tfidf_similar'] = similar_feature.loc[similar_score['tfidf_similar'],'node'].values
-    similar_score = similar_score.rename(columns={'tfidf_similar': 'node_similar'})
+    # ignore self matchings records
+    similar_score = similar_score[similar_score.index!=similar_score['node_similar']]
+
+    # mark scores above threshold
+    similar_score['threshold'] = similar_score['score']>=threshold
+
+    # add similar_id to score
+    similar_score = similar_score.merge(similar_feature[['id_similar']], left_on='node', right_index=True)
+    # similar_score = similar_score.sort_values(by=['id_similar', 'score'], ascending=[True,False])
+
+    # # convert similar_score indexing from tfidf back to original
+    # similar_score.index = similar_feature.loc[similar_score.index,'node']
+    # similar_score['tfidf_similar'] = similar_feature.loc[similar_score['tfidf_similar'],'node'].values
+    # similar_score = similar_score.rename(columns={'tfidf_similar': 'node_similar'})
 
     return similar_score
 

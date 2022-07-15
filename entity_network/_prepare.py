@@ -12,29 +12,40 @@ default_text_cleaner = {
 
 def flatten(df, columns):
 
-    # prepare column argument
-    if isinstance(columns, str):
-        columns = [columns]
-    split_cols = [idx for idx,cols in enumerate(columns) if isinstance(cols, list)]
-    if len(split_cols)>0:
-        for idx in split_cols:
-            # join dataframe values
-            combined = ','.join(columns[idx])
-            df[combined] = df[columns[idx]].fillna('').agg(' '.join, axis=1)
-            # adjust columns argument
-            columns[idx] = combined
+    values = {'df': None, 'df2': None}
 
-    # handle columns from two dataframes with the same column name
-    columns = list(set(columns))
+    if df['df2'] is not None and not isinstance(columns, dict):
+        raise RuntimeError('Columns parameter must be a dict if two dataframe are provided.')
 
-    # check presence of columns
-    columns = pd.Series(columns)
-    missing = columns[~columns.isin(df)]
-    if any(missing):
-        raise _exceptions.MissingColumn(f'Argument columns not in DataFrame: {missing.tolist()}')
+    for frame, cols in columns.items():
 
-    # prepare multiple columns by pivoting into a single column
-    values = df[columns].stack()
+        # skip processing df2 if not provided
+        if df[frame] is None:
+            continue
+
+        # change string to a list for potentially stacking of multiple columns
+        if isinstance(cols, str):
+            cols = [cols]
+
+        # combine multiple columns into single if nested list
+        split_cols = [idx for idx,nested in enumerate(cols) if isinstance(nested, list)]
+        if len(split_cols)>0:
+            for idx in split_cols:
+                # form a single column name
+                combined = ','.join(cols[idx])
+                # join non-na columns using a space
+                df[frame][combined] = df[frame][cols[idx]].fillna('').agg(' '.join, axis=1)
+                # adjust columns argument
+                cols[idx] = combined
+
+        # # check presence of columns
+        # cols = pd.Series(cols)
+        # missing = cols[~cols.isin(df)]
+        # if any(missing):
+        #     raise _exceptions.MissingColumn(f'Argument columns not in DataFrame: {missing.tolist()}')
+
+        # prepare multiple columns by pivoting into a single column
+        values[frame] = df[frame][cols].stack()
 
     return values
 

@@ -103,9 +103,9 @@ def test_two_dfs_exact():
     # generate sample data
     df1 = sample.unique_records(n_unique)
     columns = {
-        'phone': ['HomePhone','WorkPhone','CellPhone', 'Phone'],
-        'email': ['Email','EmailAddress'],
-        'address': ['Address','StreetAddress']
+        'phone': {'df': ['HomePhone','WorkPhone','CellPhone'], 'df2':['Phone']},
+        'email': {'df': 'Email', 'df2': 'EmailAddress'},
+        'address': {'df': 'Address', 'df2':'StreetAddress'}
     }
     df2, sample_id, sample_map = sample.duplicate_df(df1, n_duplicates, columns)
 
