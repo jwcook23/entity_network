@@ -154,7 +154,7 @@ class entity_resolver():
         return self.network_id, self.network_map, self.network_feature
 
 
-    def debug_similar(self, category):
+    def debug_similar(self, category, cluster_edge_limit=5):
         
         comparer = {'address': _compare.address}
 
@@ -188,18 +188,18 @@ class entity_resolver():
                 on='df2_index_similar', how='left',
             )
 
-        # determine differences between similar values
-        # TODO: provide a summary of differences
-        columns = list(df_categories.values())+list(df2_categories.values())
-        columns = [x for x in columns if x is not None]
-        similar[f'{category}_difference'] = similar[columns].apply(comparer[category], axis=1)
-
         # group by id and score
         similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
 
-        # split by in/out of cluster with closest distance to cluster edge appearing first
-        in_cluster = similar[similar['threshold']].sort_values(by='score', ascending=True)
-        out_cluster = similar[~similar['threshold']].sort_values(by='score', ascending=False)
+        # split by in/out of cluster with closest distance to cluster edge appearing first and return comparison of difference
+        # TODO: provide a summary of differences
+        # TODO: provide elbow diagram of score to help determine where the threshold should be (change point)
+        columns = list(df_categories.values())+list(df2_categories.values())
+        columns = [x for x in columns if x is not None]
+        in_cluster = similar[similar['threshold']].sort_values(by='score', ascending=True).head(cluster_edge_limit)
+        in_cluster[f'{category}_difference'] = in_cluster[columns].apply(comparer[category], axis=1)
+        out_cluster = similar[~similar['threshold']].sort_values(by='score', ascending=False).head(cluster_edge_limit)
+        out_cluster[f'{category}_difference'] = out_cluster[columns].apply(comparer[category], axis=1)
 
         return similar, in_cluster, out_cluster
 
