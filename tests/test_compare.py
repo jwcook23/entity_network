@@ -32,34 +32,33 @@ def test_similar_address():
 
     df = pd.read_csv(file_path)
     df = df[df['threshold=0.7']==1]
-    df1 = df[['Address0']].head(15)
-    df2 = df[['Address1']].head(6)
+    df1 = df[['Address0']]
+    df2 = df[['Address1']]
 
     er = entity_resolver(df1, df2)
     er.compare('address', columns={'df': 'Address0', 'df2': 'Address1'}, threshold=0.7)
 
     network_id, _, _ = er.network()
 
-    actual = network_id.groupby('network_id')
+    expected = network_id.groupby('network_id')
     list_notna = lambda l: [x for x in l if pd.notna(x)]
-    actual = actual.agg({
+    expected = expected.agg({
         'df_index': list_notna,
         'df2_index': list_notna
     })
 
 
-    actual = actual.apply(pd.Series.explode)
-    missing_df = df1.index[~df1.index.isin(actual['df_index'])]
-    missing_df2 = df2.index[~df2.index.isin(actual['df2_index'])]
+    expected = expected.apply(pd.Series.explode)
+    missing_df = df1.index[~df1.index.isin(expected['df_index'])]
+    missing_df2 = df2.index[~df2.index.isin(expected['df2_index'])]
 
     # comparison = er.index_comparison('address', index_df=missing_df, index_df2=missing_df2)
-    assert (actual['df_index']==actual['df2_index']).all()
+    assert (expected['df_index']==expected['df2_index']).all()
     assert len(missing_df)==0
     assert len(missing_df2)==0
 
 
-def test_combine_similar_exact():
-
+def test_nothing_similar():
 
     df1 = pd.DataFrame({
         'AddressA': [
@@ -69,23 +68,42 @@ def test_combine_similar_exact():
     })
     df2 = pd.DataFrame({
         'AddressA': [
-            '1234 S NameB Street Town, ST 56789',
+            '5678 N NameB Road Place, NA 01234',
+        ],
+    })
+
+    er = entity_resolver(df1, df2)
+    er.compare('address', columns={'df': 'AddressA', 'df2': 'AddressA'}, threshold=0.8)
+
+
+def test_combine_similar_exact():
+
+
+    df1 = pd.DataFrame({
+        'AddressA': [
+            '1234 SW NameA Street Town, ST 56789',
+            '1234 South NameA Street Town, ST 56789-0147'
+        ],
+    })
+    df2 = pd.DataFrame({
+        'AddressA': [
+            '1234 SE NameB Street Town, ST 56789',
             '1234 South NameA Street Town, ST 56789-0147'
         ],
     })
 
 
     er = entity_resolver(df1, df2)
-    er.compare('address', columns=['AddressA', 'AddressA'], threshold=0.8)
+    er.compare('address', columns={'df': 'AddressA', 'df2': 'AddressA'}, threshold=0.8)
 
     expected = pd.DataFrame({
-        'column': ['AddressA']*5,
-        'id_exact': [0,0,0,pd.NA, pd.NA],
-        'id_similar': [pd.NA, pd.NA, pd.NA, 0, 0],
-        'address_id': [0]*5,
-        'df_index': [0, 1, pd.NA, 0, pd.NA],
-        'df2_index': [pd.NA, pd.NA, 1, pd.NA, 0]
-    }, index=pd.Index([0,1,3,0,2], name='node'))
+        'column': ['AddressA']*4,
+        'id_exact': [0,0, pd.NA, pd.NA],
+        'id_similar': [0, 0, 0, 0],
+        'address_id': [0]*4,
+        'df_index': [1, pd.NA, 0, pd.NA],
+        'df2_index': [pd.NA, 1, pd.NA, 0]
+    }, index=pd.Index([1,3,0,2], name='node'))
     expected['column'] = expected['column'].astype('string')
     cols = ['id_exact','id_similar','df_index','df2_index']
     expected[cols] = expected[cols].astype('Int64')

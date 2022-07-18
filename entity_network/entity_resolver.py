@@ -14,7 +14,7 @@ class entity_resolver():
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
 
-        self._df = _index.unique(df, df2)
+        self._df, self._index_mask = _index.unique(df, df2)
 
         self.network_feature = {}
         self.similar_score = {}
@@ -45,13 +45,15 @@ class entity_resolver():
             print(f'Cleaning category for comparison: {category}.')
             tstart = time()
             for frame, values in self.processed[category].items():
-                self.processed[category][frame] = _prepare.clean(values, category, text_cleaner)
+                if values is not None:
+                    self.processed[category][frame] = _prepare.clean(values, category, text_cleaner)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # set sources for tracability when comparing multiple categories
         for frame, values in self.processed[category].items():
-            self.processed[category][frame].index.names = ('node', 'column')
-            self.processed[category][frame].name = category
+            if values is not None:
+                self.processed[category][frame].index.names = ('node', 'column')
+                self.processed[category][frame].name = category
 
         # ignore values the processor completely removed
         # self.processed[category] = self.processed[category].dropna()
@@ -77,7 +79,7 @@ class entity_resolver():
         else:
             print(f'Creating tfidf for category: {category}.')
             tstart = time()
-            tfidf, tfidf_index = _compare.create_tfidf(category, self.processed[category], text_comparer)
+            tfidf, tfidf_index = _compare.create_tfidf(category, self.processed[category], text_comparer, related_feature)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'create_tfidf', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Finding similar matches for category: {category}.')
@@ -117,8 +119,11 @@ class entity_resolver():
         self.similar_score[category] = similar_score
 
         # add original index to processed values
-        self.processed[category] = self.processed[category].reset_index()
-        self.processed[category] = _index.original(self.processed[category], self._index_mask)
+        self.processed[category]['df'] = self.processed[category]['df'].reset_index()
+        self.processed[category]['df'] = self.processed[category]['df'].merge(self._index_mask['df'], on='node')
+        if self._index_mask['df2']is not None:
+            self.processed[category]['df2'] = self.processed[category]['df2'].reset_index()
+            self.processed[category]['df2'] = self.processed[category]['df2'].merge(self._index_mask['df2'], on='node')
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
@@ -129,7 +134,7 @@ class entity_resolver():
         # form matrix of indices connected on any feature
         print('Combining matching features into a single matrix.')
         tstart = time()
-        network_map = _helpers.combine_features(self.network_feature, self._df.index)
+        network_map = _helpers.combine_features(self.network_feature)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'combine_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # determine an overall id using indices connected on any feature
@@ -158,7 +163,8 @@ class entity_resolver():
 
         # add processed values into similar score for the first dataframe
         df_categories = {'exact': f'df_{category}', 'similar': f'df_{category}_similar'}
-        processed = self.processed[category][['df_index', category]].dropna(subset='df_index')
+        processed = self.processed[category]['df']
+        processed = processed[['df_index', category]].dropna(subset='df_index')
         similar = similar.merge(
             processed.rename(columns={category: df_categories['exact']}), 
             on='df_index', how='left'

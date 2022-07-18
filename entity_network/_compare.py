@@ -35,10 +35,16 @@ def exact_match(values):
 
     return related_feature
 
-def create_tfidf(category, values, text_comparer):
+def create_tfidf(category, values, text_comparer, related_feature):
 
-    tfidf = {'df': None, 'df2': None}
-    tfidf_index = {'df': None, 'df2': None}
+    # remove duplicates and nulls to lower kneighbors parameter needed
+    for frame in values.keys():
+        if values[frame] is not None:
+            # remove duplicates in the same dataframe or other frame identified in previous step
+            # values[frame] = values[frame][~values[frame].index.get_level_values('node').isin(related_feature['node'])]
+            values[frame] = values[frame].drop_duplicates()
+            # remove missing values that were completely removed during preprocessing
+            values[frame] = values[frame].dropna()
 
     # define vectorizer to transform text to numbers
     if text_comparer=='default':
@@ -54,21 +60,20 @@ def create_tfidf(category, values, text_comparer):
         stop_words=None
     )
 
+    # create tfidf and a map between tfidf_index and nodes
+    tfidf = {'df': None, 'df2': None}
+    tfidf_index = {'df': None, 'df2': None}
     for frame, data in values.items():
         # skip df2 if not provided
         if data is None:
             continue
-        # remove duplicates to lower computations needed for similar_feature matching
-        unique = data.drop_duplicates()
-        # remove missing values that were completely removed during preprocessing
-        unique = unique.dropna()
         # transform text to tfidf
         if frame=='df':
-            tfidf[frame] = vectorizer.fit_transform(unique.to_list())
+            tfidf[frame] = vectorizer.fit_transform(data.to_list())
         else:
-            tfidf[frame] = vectorizer.transform(unique.to_list())
+            tfidf[frame] = vectorizer.transform(data.to_list())
         # create TF-IDF index relation to original data index
-        tfidf_index[frame] = unique.index.to_frame(index=False, name=['node','column'])
+        tfidf_index[frame] = data.index.to_frame(index=False, name=['node','column'])
         tfidf_index[frame].index.name = 'tfidf_index'
 
     return tfidf, tfidf_index
@@ -92,9 +97,13 @@ def similar_match(tfidf, tfidf_index, kneighbors):
     # replace tfidf_index with node index
     similar_score = {}
     for idx, comparison in enumerate(neighbors):
-        # lookup node index in the second (smaller) dataframe
-        node_source = tfidf_index['df2'].at[idx, 'node']
-        # lookup node index in the first (larger) dataframe
+        if tfidf['df2'] is None:
+            # lookup index in the single dataframe
+            node_source = tfidf_index['df'].at[idx, 'node']
+        else:
+            # lookup node index in the second (smaller) dataframe
+            node_source = tfidf_index['df2'].at[idx, 'node']
+        # lookup node index in the first (larger) or single dataframe
         node_target = tfidf_index['df'].loc[comparison[0], 'node'].values
         # adjust score for negative dot product
         score = comparison[1]*-1
@@ -107,9 +116,9 @@ def similar_id(similar_score, tfidf_index, threshold):
 
     # determine node size needed
     if tfidf_index['df2'] is None:
-        n = tfidf_index['df']['node'].max()
+        n = tfidf_index['df']['node'].max()+1
     else:
-        n = tfidf_index['df2']['node'].max()
+        n = tfidf_index['df2']['node'].max()+1
     
     # form list of lists sparse matrix incrementally
     graph = lil_matrix((n, n), dtype=int)
@@ -127,8 +136,15 @@ def similar_id(similar_score, tfidf_index, threshold):
         'id_similar': labels
     })
 
+    # include source column info
+    similar_feature = similar_feature.merge(tfidf_index['df'], on='node', how='left')
+    if tfidf_index['df2'] is not None:
+        similar_feature = similar_feature.merge(tfidf_index['df2'], on='node', how='left', suffixes=('','_df2'))
+        similar_feature['column'] =  similar_feature['column'].fillna(similar_feature['column_df2'])
+        similar_feature = similar_feature.drop(columns='column_df2')
+
     # return ids for the main dataframe only
-    similar_feature = similar_feature[similar_feature['node'].isin(tfidf_index['df']['node'])]
+    # similar_feature = similar_feature[similar_feature['node'].isin(tfidf_index['df']['node'])]
 
     return similar_feature
 
@@ -136,26 +152,22 @@ def similar_id(similar_score, tfidf_index, threshold):
 def expand_score(similar_score, similar_feature, threshold):
 
     # convert from dictionary to dataframe
-    similar_score = pd.DataFrame.from_dict(similar_score, orient='index', columns=['node_similar', 'score'])
-    similar_score.index.name = 'node'
+    similar_score = pd.DataFrame.from_dict(similar_score, orient='index', columns=['node', 'score'])
+    similar_score.index.name = 'node_similar'
     similar_score = similar_score.apply(pd.Series.explode)
-    similar_score['node_similar'] = similar_score['node_similar'].astype('int64')
-    similar_score['score'] = similar_score['score'].astype('float64')
+    similar_score['node'] = similar_score['node'].astype('Int64')
+    similar_score['score'] = similar_score['score'].astype('Float64')
 
     # ignore self matchings records
-    similar_score = similar_score[similar_score.index!=similar_score['node_similar']]
+    similar_score = similar_score[similar_score.index!=similar_score['node']]
 
     # mark scores above threshold
     similar_score['threshold'] = similar_score['score']>=threshold
 
-    # add similar_id to score
-    similar_score = similar_score.merge(similar_feature[['id_similar']], left_on='node', right_index=True)
-    # similar_score = similar_score.sort_values(by=['id_similar', 'score'], ascending=[True,False])
-
-    # # convert similar_score indexing from tfidf back to original
-    # similar_score.index = similar_feature.loc[similar_score.index,'node']
-    # similar_score['tfidf_similar'] = similar_feature.loc[similar_score['tfidf_similar'],'node'].values
-    # similar_score = similar_score.rename(columns={'tfidf_similar': 'node_similar'})
+    # add column source and similar_id to score
+    similar_score = similar_score.merge(similar_feature[['column','id_similar']], left_on='node', right_index=True)
+    similar_score.index.name = 'node_similar'
+    similar_score = similar_score.sort_values(by=['id_similar', 'score'], ascending=[True,False])
 
     return similar_score
 
@@ -167,17 +179,38 @@ def combined_id(related_feature, similar_feature, id_category):
     similar_feature = similar_feature[similar_feature['id_similar'].isin(multiple.index)]
 
     # add similar_feature into exact matches
-    related_feature = pd.concat([related_feature, similar_feature], ignore_index=True)
+    related_feature = related_feature.merge(similar_feature, on=['node','column'], how='outer', suffixes=('','_similar'))
     related_feature[['id_exact','id_similar']] = related_feature[['id_exact','id_similar']].astype('Int64')
 
     # develop an overall id based on both similar and exact id
-    related_feature['temp_id'] = related_feature.groupby(['id_exact','id_similar'], dropna=False).ngroup()
-    combine = related_feature.groupby('node')
-    combine = combine.agg({'temp_id': list})
-    combine[id_category] = combine['temp_id'].apply(lambda x: x[0])
-    combine = combine.explode('temp_id')
-    combine = combine.drop_duplicates(keep='first', subset='temp_id')
-    related_feature = related_feature.merge(combine, on='temp_id')
+    # related_feature['temp_id'] = related_feature.groupby(['id_exact','id_similar'], dropna=False).ngroup()
+    # combine = related_feature.groupby('node')
+    # combine = combine.agg({'temp_id': list})
+    # combine[id_category] = combine['temp_id'].apply(lambda x: x[0])
+    # combine = combine.explode('temp_id')
+    # combine = combine.drop_duplicates(keep='first', subset='temp_id')
+    # related_feature = related_feature.merge(combine, on='temp_id')
+    # related_feature = related_feature.drop(columns='temp_id')
+
+    # develop an overall using both similar and exact ids
+    # 1. assume the same exact id for the same similar id
+    connected = related_feature[['id_similar','id_exact']].dropna()
+    connected = connected.groupby('id_similar')
+    connected = connected.agg({'id_exact': 'first'})
+    connected = connected.rename(columns={'id_exact': id_category})
+    related_feature = related_feature.merge(connected, left_on='id_similar', right_index=True, how='left')
+    # 2. use exact id if not similar
+    related_feature[id_category] = related_feature[id_category].fillna(related_feature['id_exact'])
+    # 3. derive an id if only similar
+    derive = related_feature.loc[related_feature[id_category].isna(),['id_similar']]
+    derive = derive.drop_duplicates()
+    seed = related_feature[id_category].max()+1
+    if pd.isna(seed):
+        seed = 0
+    derive['temp_id'] = range(seed, len(derive)+seed)
+    related_feature = related_feature.merge(derive, on='id_similar', how='left')
+    related_feature['temp_id'] = related_feature['temp_id'].astype('Int64')
+    related_feature[id_category] = related_feature[id_category].fillna(related_feature['temp_id'])
     related_feature = related_feature.drop(columns='temp_id')
 
     return related_feature, similar_feature

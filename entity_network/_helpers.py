@@ -3,17 +3,16 @@ import pandas as pd
 from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
 
-def combine_features(relationships, indices):
+def combine_features(relationships):
     '''Combine records with matching feature ids.'''
 
-    network_map = pd.DataFrame(index=indices)
+    network_map = pd.DataFrame()
     for category, related in relationships.items():
         id_category = f'{category}_id'
         related = related[[id_category]].copy()
-        network_map = network_map.merge(related, how='left', left_index=True, right_index=True)
+        network_map = network_map.merge(related, how='outer', left_index=True, right_index=True)
         network_map[id_category] = network_map[id_category].astype('Int64')
     network_map = network_map[network_map.notna().any(axis='columns')]
-    network_map.index.name = 'node'
     network_map = network_map.reset_index()
 
     return network_map

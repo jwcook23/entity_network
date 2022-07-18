@@ -14,8 +14,14 @@ def flatten(df, columns):
 
     values = {'df': None, 'df2': None}
 
-    if df['df2'] is not None and not isinstance(columns, dict):
-        raise RuntimeError('Columns parameter must be a dict if two dataframe are provided.')
+    if df['df2'] is None:
+        if not isinstance(columns, dict):
+            columns = {'df': columns}
+    else:
+        if not isinstance(columns, dict):
+            raise RuntimeError('Columns parameter must be a dict if two dataframes are provided.')
+        if len({'df','df2'}-set(columns.keys()))>0:
+            raise RuntimeError('Columns parameter must contain keys for df and df2 if two dataframes are provided.')
 
     for frame, cols in columns.items():
 

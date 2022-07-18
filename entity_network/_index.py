@@ -19,6 +19,12 @@ default_text_comparer = {
 
 def unique(df, df2):
 
+    # make soft copy to preserve originals
+    df = df.copy()
+    if df2 is not None:
+        df2 = df2.copy()
+
+    # enforce unique values for tracking values
     if df.index.has_duplicates:
         raise _exceptions.DuplicatedIndex('Argument df index must be unique.')
     if df2 is not None and df2.index.has_duplicates:
@@ -56,7 +62,7 @@ def unique(df, df2):
     #     # stack df2 on each of df for a single df to be compared
     #     df = pd.concat([df, df2])
 
-    return dfs
+    return dfs, index_mask
 
 
 def original(reindexed, index_mask, index_name = 'node'):
