@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from entity_network import clean_text, _exceptions
 
@@ -71,13 +72,21 @@ def original(reindexed, index_mask, index_name = 'node'):
     if index_name=='node_similar':
         mask.name = f'{mask.name}_similar'
     reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
-    reindexed[mask.name] = reindexed[mask.name].astype('Int64')
+    if is_numeric_dtype(index_mask['df']):
+        dtype = str(index_mask['df'].dtype).capitalize()
+    else:
+        dtype = str(index_mask['df'].dtype)
+    reindexed[mask.name] = reindexed[mask.name].astype(dtype)
     if index_mask['df2'] is not None:
         mask = index_mask['df2'].copy()
         if index_name=='node_similar':
             mask.name = f'{mask.name}_similar'        
         reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
-        reindexed[mask.name] = reindexed[mask.name].astype('Int64')
+        if is_numeric_dtype(index_mask['df2']):
+            dtype = str(index_mask['df2'].dtype).capitalize()
+        else:
+            dtype = str(index_mask['df2'].dtype)
+        reindexed[mask.name] = reindexed[mask.name].astype(dtype)
 
     return reindexed
 

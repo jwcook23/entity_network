@@ -55,15 +55,6 @@ class entity_resolver():
                 self.processed[category][frame].index.names = ('node', 'column')
                 self.processed[category][frame].name = category
 
-        # ignore values the processor completely removed
-        # self.processed[category] = self.processed[category].dropna()
-
-        # # compare values on similarity threshold
-        # print(f'Comparing category: {category}.')
-        # tstart = time()
-        # self.network_feature[category], self.similar_score[category] = _compare.match(category, self.processed[category], kneighbors, threshold, text_comparer, self._index_mask)
-        # self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
-
         # find exact matches
         print(f'Finding exact matches for category: {category}.')
         tstart = time()
