@@ -8,6 +8,9 @@ def combine_features(relationships):
 
     network_map = pd.DataFrame()
     for category, related in relationships.items():
+        if category=='name':
+            # use all features besides name for forming network
+            continue
         id_category = f'{category}_id'
         related = related[[id_category]].copy()
         network_map = network_map.merge(related, how='outer', left_index=True, right_index=True)
@@ -43,6 +46,7 @@ def overall_id(network_map):
     network_map = network_map.drop(columns='temp_id')
 
     # determine overall network id
+    # TODO: remove network_id and keep network_map only?
     network_id = network_map[['node','network_id']]
     network_id = network_id.drop_duplicates(subset='node')
 

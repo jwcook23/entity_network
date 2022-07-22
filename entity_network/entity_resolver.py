@@ -16,17 +16,24 @@ class entity_resolver():
 
         self._df, self._index_mask = _index.unique(df, df2)
 
+        # preprocessed text values
+        self.processed = {}
+
+        # outputs from compare method
         self.network_feature = {}
         self.similar_score = {}
-        # self.network_map = None
-        # self.network_id = None
-        # self.entity_feature = None
-        # self.entity_id = None
-        self.processed = {}
+        
+        # outputs from network method
+        self.network_feature = {}
+        self.network_id, self.network_map = [None]*2
+
+        # outputs form entity method
+        # self.entity_feature, self.entity_id  = [None]*2
+        
         self.timer = pd.DataFrame(columns=['caller','file','method','category','time_seconds'])
 
 
-    def compare(self, category, columns, kneighbors:int=10, threshold:float=1, text_comparer='default', text_cleaner='default'):
+    def compare(self, category, columns, threshold:float=1, kneighbors:int=10, text_comparer='default', text_cleaner='default'):
 
         # input arguments
         if not isinstance(kneighbors, int) or kneighbors<0:
@@ -105,9 +112,11 @@ class entity_resolver():
         related_feature, similar_score = _compare.translate_index(related_feature, similar_score, self._index_mask, id_category)
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'translate_index', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
-        # assign class properties
-        self.network_feature[category] = related_feature
+        # store similarity for debugging
         self.similar_score[category] = similar_score
+
+        # store features for forming network and entity resolution
+        self.network_feature[category] = related_feature
 
         # add original index to processed values
         self.processed[category]['df'] = self.processed[category]['df'].reset_index()
@@ -118,6 +127,8 @@ class entity_resolver():
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
+
+        return related_feature, similar_score
 
 
     def network(self):
@@ -139,11 +150,26 @@ class entity_resolver():
         self.network_id, self.network_map = _index.network(network_id, network_map, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'network', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
+        # resolve entity if needed
+        if 'name' in self.network_feature:
+            self._entity()
+
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
 
         return self.network_id, self.network_map, self.network_feature
 
+    def _entity(self):
+
+        # assume similar names in the same network are the same entity
+        # TODO: require a single matching feature instead of the entire network?
+        entity = self.network_map[['network_id']].merge(
+            self.network_feature['name'][['name_id']], 
+            left_index=True, right_index=True, how='left'
+        )
+        entity = entity.groupby(['network_id','name_id']).ngroup()
+
+        self.network_map['entity_id'] = entity
 
     def debug_similar(self, category, cluster_edge_limit=5):
         
@@ -198,28 +224,78 @@ class entity_resolver():
     # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
     # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
 
-        # form nodes using unique pairwise connections
-        edges = self.network_id.reset_index()
-        edges = edges.groupby('network_id')
-        edges = edges.agg({'node': list})
+        G = nx.Graph()
+
+        # for category, feature in self.network_feature:
+        # category = 'address'
+        # feature = self.network_feature[category]
+        # feature = feature.copy().reset_index()
+
+        network = self.network_map
+
+        # remove duplicates for an entity
+        network = network.drop_duplicates(subset=['entity_id','address_id','phone_id','email_id'])
+
+        # add name of node
+        network = network.merge(self._df['df'][['ContactName']], left_on='node', right_index=True)
+
+        # add entity_id
+        # feature = feature.merge(self.network_map[['entity_id']], left_on='node', right_index=True)
+
+        # remove duplicates for entities
+        # feature = feature.drop_duplicates(subset=['entity_id', f'{category}_id'])
+
+        # # add match value
+        # columns = feature['column'].unique()
+        # match = self._df['df'][columns].stack()
+        # match.index.names = ['node','column']
+        # match.name = 'value'
+        # match = match.reset_index()
+        # feature = feature.merge(match, on=['node','column'])
+
+        G.add_nodes_from(zip(
+            # node identifier
+            feature['node'],
+            # node attributes
+            [{
+                # node name
+                **{'ContactName': x[0]},
+                **{'EntityID': x[1]},
+                # matching feature
+                **{x[2]:x[3]}
+            } for x in feature[['ContactName','entity_id','column','value']].values]
+        ))
+
+        edges = feature.groupby(f'{category}_id')
+        edges = edges.agg({
+            'node': list
+        })
         edges = edges['node'].to_list()
-        # G = nx.from_edgelist(chain.from_iterable(combinations(e, 2) for e in edges))
-        G = nx.compose_all(map(nx.complete_graph, edges))
+        G.add_edges_from(chain.from_iterable(combinations(e, 2) for e in edges))
+        # G = nx.compose_all(map(nx.complete_graph, edges))
         # G = nx.karate_club_graph()
 
         # SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
         edge_attrs = {}
 
         for start_node, end_node, _ in G.edges(data=True):
-            # edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
+        #     # edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
             edge_attrs[(start_node, end_node)] = "black"
 
         nx.set_edge_attributes(G, edge_attrs, "edge_color")
 
+        tooltips = [
+            ('Node', '$index'),
+            ('Entity ID', '@EntityID'),
+            ('ContactName', '@ContactName'),
+            ('ContactAddress', '@ContactAddress')
+        ]
+
         plot = figure(width=800, height=600, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
                     x_axis_location=None, y_axis_location=None,
                     title="Graph Interaction Demo", background_fill_color="#efefef",
-                    tooltips="index: @index, club: @club")
+                    tooltips=tooltips
+        )
         plot.grid.grid_line_color = None
 
         graph_renderer = from_networkx(G, nx.spring_layout, scale=1, center=(0, 0))
