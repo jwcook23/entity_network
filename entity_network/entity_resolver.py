@@ -1,6 +1,7 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from time import time
 from itertools import combinations, chain
+from collections import OrderedDict
 
 import pandas as pd
 import networkx as nx
@@ -169,7 +170,15 @@ class entity_resolver():
         )
         entity = entity.groupby(['network_id','name_id']).ngroup()
 
+        # assume entity_id without a name_id
+        assume = entity==-1
+        seed = entity.max()+1
+        if pd.isna(seed):
+            seed = 0
+        entity[assume] = range(seed, seed+sum(assume))
+
         self.network_map['entity_id'] = entity
+    
 
     def debug_similar(self, category, cluster_edge_limit=5):
         
@@ -231,65 +240,77 @@ class entity_resolver():
         # feature = self.network_feature[category]
         # feature = feature.copy().reset_index()
 
-        network = self.network_map
+        network = self.network_map.reset_index()
 
         # remove duplicates for an entity
         network = network.drop_duplicates(subset=['entity_id','address_id','phone_id','email_id'])
 
-        # add name of node
-        network = network.merge(self._df['df'][['ContactName']], left_on='node', right_index=True)
+        # track unique column sources for hover display ensure name if first
+        source = list(self.network_feature.keys())
+        source.remove('name')
+        source = ['name']+source
+        source = OrderedDict(zip(source, [None]*len(source)))
 
-        # add entity_id
-        # feature = feature.merge(self.network_map[['entity_id']], left_on='node', right_index=True)
+        # add feature value
+        # TODO: include in base class, take into account two dataframes
+        for category,feature in self.network_feature.items():
 
-        # remove duplicates for entities
-        # feature = feature.drop_duplicates(subset=['entity_id', f'{category}_id'])
+            name_column = f'{category}_column'
+            name_value = f'{category}_value'
 
-        # # add match value
-        # columns = feature['column'].unique()
-        # match = self._df['df'][columns].stack()
-        # match.index.names = ['node','column']
-        # match.name = 'value'
-        # match = match.reset_index()
-        # feature = feature.merge(match, on=['node','column'])
+            feature = feature[['column']].rename(columns={'column': name_column})
+            source[category] = feature[name_column].unique()
 
-        G.add_nodes_from(zip(
-            # node identifier
-            feature['node'],
-            # node attributes
-            [{
-                # node name
-                **{'ContactName': x[0]},
-                **{'EntityID': x[1]},
-                # matching feature
-                **{x[2]:x[3]}
-            } for x in feature[['ContactName','entity_id','column','value']].values]
-        ))
+            network = network.merge(feature, left_on='node', right_index=True, how='left')
+            columns = network[name_column].dropna().unique()
+            value = self._df['df'][columns].stack()
+            value = value.reset_index(level=1)
+            value.columns = [name_column, name_value]
+            network = network.merge(value, on=['node', name_column], how='left')
 
-        edges = feature.groupby(f'{category}_id')
-        edges = edges.agg({
-            'node': list
-        })
-        edges = edges['node'].to_list()
-        G.add_edges_from(chain.from_iterable(combinations(e, 2) for e in edges))
+        # add nodes with matching features
+        def attrs(df):
+            values = df.unstack().dropna().values
+            values = dict(zip(values[0::2], values[1::2]))
+            return values
+        columns = list(chain.from_iterable([[x+'_column',x+'_value'] for x in source.keys()]))
+        entity = network.groupby('entity_id')
+        entity = entity[columns].apply(attrs)
+        entity = list(zip(entity.index, entity.values))
+        G.add_nodes_from(entity)
+
+        # add edges
+        for category in self.network_feature.keys():
+            if category=='name':
+                continue
+            edges = network.groupby(f'{category}_id')
+            edges = edges.agg({
+                'entity_id': list
+            })
+            edges = edges[edges['entity_id'].str.len()>1]
+            # TODO: add 3-tuple where the 3rd is the edge attribute describing how the connection is made
+            edges['entity_id'] = edges['entity_id'].apply(lambda x: list(zip(x[0:-1], x[1::])))
+            edges = edges.explode('entity_id')
+            edges = edges['entity_id'].to_list()
+
+            G.add_edges_from(edges)
+            # G.add_edges_from(chain.from_iterable(combinations(e, 2) for e in edges))
         # G = nx.compose_all(map(nx.complete_graph, edges))
         # G = nx.karate_club_graph()
 
         # SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
         edge_attrs = {}
-
         for start_node, end_node, _ in G.edges(data=True):
-        #     # edge_color = SAME_CLUB_COLOR if G.nodes[start_node]["club"] == G.nodes[end_node]["club"] else DIFFERENT_CLUB_COLOR
             edge_attrs[(start_node, end_node)] = "black"
 
         nx.set_edge_attributes(G, edge_attrs, "edge_color")
 
+        # 
         tooltips = [
-            ('Node', '$index'),
-            ('Entity ID', '@EntityID'),
-            ('ContactName', '@ContactName'),
-            ('ContactAddress', '@ContactAddress')
+            ('Entity ID', '$index'),
         ]
+        columns = list(chain.from_iterable(source.values()))
+        tooltips = tooltips + [(x,'@'+x) for x in columns]
 
         plot = figure(width=800, height=600, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
                     x_axis_location=None, y_axis_location=None,
