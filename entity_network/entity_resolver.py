@@ -1,14 +1,10 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
+from msilib import Feature
 from time import time
-from itertools import combinations, chain
-from collections import OrderedDict
 
 import pandas as pd
-import networkx as nx
-from bokeh.models import Circle, MultiLine, HoverTool
-from bokeh.plotting import figure, from_networkx, show, output_file
 
-from entity_network import _index, _prepare, _compare, _helpers, _exceptions
+from entity_network import _index, _prepare, _compare, _helpers, _exceptions, network_ploter
 
 class entity_resolver():
 
@@ -164,21 +160,41 @@ class entity_resolver():
 
         # assume similar names in the same network are the same entity
         # TODO: require a single matching feature instead of the entire network?
-        entity = self.network_map[['network_id']].merge(
+        entity_id = self.network_map[['network_id']].merge(
             self.network_feature['name'][['name_id']], 
             left_index=True, right_index=True, how='left'
         )
-        entity = entity.groupby(['network_id','name_id']).ngroup()
+        entity_id = entity_id.groupby(['network_id','name_id']).ngroup()
 
         # assume entity_id without a name_id
-        assume = entity==-1
-        seed = entity.max()+1
+        assume = entity_id==-1
+        seed = entity_id.max()+1
         if pd.isna(seed):
             seed = 0
-        entity[assume] = range(seed, seed+sum(assume))
+        entity_id[assume] = range(seed, seed+sum(assume))
 
-        self.network_map['entity_id'] = entity
+        # assign resolved entity to network map
+        self.network_map['entity_id'] = entity_id
     
+        # determine unique features belonging to an entity
+        self.entity = pd.DataFrame(columns=['entity_id','column','value','category'])
+        for category, feature in self.network_feature.items():
+            # determine matching column
+            details = self.network_map[['entity_id']]
+            details = details.merge(feature[['column']], on='node', how='left')
+            # add value from matching column
+            # TODO: handle possibly two dataframes
+            columns = details['column'].dropna().unique()
+            value = self._df['df'][columns].stack()
+            value.name = 'value'
+            details = details.merge(value, left_on=['node','column'], right_index=True)
+            # remove duplicated info
+            details = details.drop_duplicates()
+            # add source category
+            details['category'] = category
+            # combine details from each features
+            self.entity = pd.concat([self.entity, details])
+
 
     def debug_similar(self, category, cluster_edge_limit=5):
         
@@ -229,139 +245,6 @@ class entity_resolver():
 
         return similar, in_cluster, out_cluster
 
-    def plot_network(self, file_name):
-    # http://docs.bokeh.org/en/latest/docs/gallery/network_graph.html
-    # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
-
-        G = nx.Graph()
-
-        # for category, feature in self.network_feature:
-        # category = 'address'
-        # feature = self.network_feature[category]
-        # feature = feature.copy().reset_index()
-
-        network = self.network_map
-
-        # calculate network summary
-        # TODO: include in base class
-        network_summary = network.groupby('network_id')
-        network_summary = network_summary.agg({'entity_id': 'nunique'})
-        network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
-        network_summary = network_summary.sort_values('entity_count', ascending=False)
-
-        network = network[network['network_id']==network_summary.index[0]]
-
-        # remove duplicates for an entity
-        network = network.drop_duplicates(subset=['entity_id','address_id','phone_id','email_id'])
-
-        # track unique column sources for hover display ensuring name if first
-        source = list(self.network_feature.keys())
-        source.remove('name')
-        source = ['name']+source
-        source = OrderedDict(zip(source, [None]*len(source)))
-
-        # aggregate features for each entity
-        entity = pd.DataFrame(columns=['entity_id','column','value'])
-        for category in source.keys():
-            # determine matching column
-            details = network[['entity_id']]
-            details = details.merge(self.network_feature[category][['column']], on='node', how='left')
-            # add value from matching column
-            columns = details['column'].dropna().unique()
-            source[category] = columns
-            value = self._df['df'][columns].stack()
-            value.name = 'value'
-            details = details.merge(value, left_on=['node','column'], right_index=True)
-            # remove duplicated info
-            details = details.drop_duplicates()
-            # combine details from each features
-            entity = pd.concat([entity, details])
-        # aggreate single unique values for each source column
-        entity = entity.groupby(['entity_id', 'column'])
-        entity = entity.agg({'value': 'unique'})
-        entity['value'] = entity['value'].apply(lambda x: '<br>'.join(x))
-        entity = entity.reset_index()
-        # aggreate nodes for networkx node attributes
-        def attrs(df):
-            values = dict((zip(df['column'],df['value'])))
-            values['Entity ID'] = df.iloc[0,0]
-            return values
-        entity = entity.groupby('entity_id')
-        entity = entity.apply(attrs)
-        # 
-        entity = list(zip(entity.index, entity.values))
-        G.add_nodes_from(entity)
-
-
-        # add edges
-        for category in self.network_feature.keys():
-            if category=='name':
-                continue
-            edges = network.groupby(f'{category}_id')
-            edges = edges.agg({
-                'entity_id': list
-            })
-            if len(edges)==0:
-                continue
-            edges = edges[edges['entity_id'].str.len()>1]
-            # TODO: add 3-tuple where the 3rd is the edge attribute describing how the connection is made
-            edges['entity_id'] = edges['entity_id'].apply(lambda x: list(zip(x[0:-1], x[1::])))
-            edges = edges.explode('entity_id')
-            edges = edges['entity_id'].to_list()
-
-            G.add_edges_from(edges)
-            # G.add_edges_from(chain.from_iterable(combinations(e, 2) for e in edges))
-        # G = nx.compose_all(map(nx.complete_graph, edges))
-        # G = nx.karate_club_graph()
-
-        # SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
-        edge_attrs = {}
-        for start_node, end_node, _ in G.edges(data=True):
-            edge_attrs[(start_node, end_node)] = "black"
-
-        nx.set_edge_attributes(G, edge_attrs, "edge_color")
-
-        tooltips = """
-        <div>
-            <span style="font-size: 14px; color: blue;">Entity ID = @{Entity ID} </span>
-        </div>
-        """
-        detail = """
-        <div>
-            <span style="font-size: 12px; color: blue;">{feature}:</span> <br>
-            <span style="font-size: 12px;">@{{{feature}}}</span>
-        </div>
-        """
-        columns = list(chain.from_iterable(source.values()))
-        tooltips += '\n'.join([detail.format(feature=feature) for feature in columns])
-
-
-
-        # tooltips = """
-        # <div>
-        #     <span style="font-size: 12px; color: blue;">Entity ID: </span>
-        #     <span style="font-size: 12px;">@{Entity ID}</span>
-        # </div>
-        # <div>
-        #     <span style="font-size: 12px; color: blue;">ContactAddress: </span>
-        #     <span style="font-size: 12px;">@{ContactAddress}</span>
-        # </div>
-        # """
-
-
-        plot = figure(width=800, height=600, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
-                    x_axis_location=None, y_axis_location=None,
-                    title="Graph Interaction Demo", background_fill_color="#efefef",
-                    tooltips=tooltips
-        )
-        plot.grid.grid_line_color = None
-
-        graph_renderer = from_networkx(G, nx.spring_layout, scale=1, center=(0, 0))
-        graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
-        graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
-                                                    line_alpha=0.8, line_width=1.5)
-        plot.renderers.append(graph_renderer)
-
-        output_file(file_name+'.html')
-
-        show(plot)
+    def plot_network(self):
+        
+        network_ploter.server(self.network_map, self.network_feature, self.entity)
