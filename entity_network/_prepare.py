@@ -1,4 +1,4 @@
-import pandas as pd
+from itertools import chain
 
 from entity_network import clean_text, _exceptions
 
@@ -13,6 +13,7 @@ default_text_cleaner = {
 def flatten(df, columns):
 
     values = {'df': None, 'df2': None}
+    compared = {'df': [None], 'df2': [None]}
 
     if df['df2'] is None:
         if not isinstance(columns, dict):
@@ -50,10 +51,17 @@ def flatten(df, columns):
         # if any(missing):
         #     raise _exceptions.MissingColumn(f'Argument columns not in DataFrame: {missing.tolist()}')
 
+        # track columns that were compared in a standard format
+        compared[frame] = cols
+
         # prepare multiple columns by pivoting into a single column
         values[frame] = df[frame][cols].stack()
 
-    return values
+    # return a flat list of compared values
+    compared = list(chain.from_iterable(compared.values()))
+    compared = [col for col in compared if col is not None]
+
+    return values, compared
 
 
 def clean(values, category, text_cleaner):

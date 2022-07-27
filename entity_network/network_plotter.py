@@ -2,32 +2,22 @@
 # https://docs.bokeh.org/en/latest/docs/user_guide/graph.html
 
 from itertools import combinations, chain
-from collections import OrderedDict
 
 import networkx as nx
-import pandas as pd
 from tornado.ioloop import IOLoop
 from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.models import Circle, MultiLine
 from bokeh.plotting import figure, from_networkx
 from bokeh.server.server import Server
+from bokeh.layouts import row, column
 
-class server():
+class network_dashboard():
 
-    def __init__(self, network_map, network_feature, entity):
-        
-        self.network_map = network_map
-        self.network_feature = network_feature
-        self.entity = entity
-        
-        self.summerize_network()
+    def __init__(self):
 
-        # track a single network only, defaulting to the first
-        self.network_map = self.network_map[self.network_map['network_id']==self.network_summary.index[0]]
-
-        # remove duplicates for an entity
-        self.network_map = self.network_map.drop_duplicates(subset=['entity_id','address_id','phone_id','email_id'])
+        self.network_selected = None
+        self.network_selected = self.network_summary.index[0]
 
         self.main()
 
@@ -46,17 +36,26 @@ class server():
 
     def modify_doc(self, doc):
 
+        network = self.plot_graph()
+        features = self.plot_features()
+
+        layout = network
+
+        doc.add_root(layout)
+        doc.title = "Network Dashboard"
+
+
+    def plot_graph(self):
+
         G = nx.Graph()
-
         self.node_details(G)
-
         self.edge_details(G)
 
         tooltips = self.generate_tooltip()
 
         plot = figure(width=800, height=600, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
                     x_axis_location=None, y_axis_location=None,
-                    title="Graph Interaction Demo", background_fill_color="#efefef",
+                    title="Selected Network Graph", background_fill_color="#efefef",
                     tooltips=tooltips
         )
         plot.grid.grid_line_color = None
@@ -67,24 +66,17 @@ class server():
                                                     line_alpha=0.8, line_width=1.5)
         plot.renderers.append(graph_renderer)
 
-        doc.add_root(plot)
-        doc.title = "Test Plot"
+        return plot
 
+    def plot_features(self):
 
-    def summerize_network(self):
-
-        # TODO: network_summary should be part of base er package
-        network_summary = self.network_map.groupby('network_id')
-        network_summary = network_summary.agg({'entity_id': 'nunique'})
-        network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
-        network_summary = network_summary.sort_values('entity_count', ascending=False)
-
-        self.network_summary = network_summary
-
+        pass
+        feature = self.entity[self.entity['network_id']==self.network_selected]
 
     def node_details(self, G):
 
-        entity = self.entity.groupby(['entity_id', 'column'])
+        entity = self.entity[self.entity['network_id']==self.network_selected]
+        entity = entity.groupby(['entity_id', 'column'])
         entity = entity.agg({'value': 'unique'})
         entity['value'] = entity['value'].apply(lambda x: '<br>'.join(x))
         entity = entity.reset_index()
@@ -106,7 +98,10 @@ class server():
         for category in self.network_feature.keys():
             if category=='name':
                 continue
-            edges = self.network_map.groupby(f'{category}_id')
+
+            edges = self.network_map[self.network_map['network_id']==self.network_selected]
+            edges = edges.drop_duplicates(subset=['entity_id','address_id','phone_id','email_id'])
+            edges = edges.groupby(f'{category}_id')
             edges = edges.agg({
                 'entity_id': list
             })
@@ -133,14 +128,6 @@ class server():
 
     def generate_tooltip(self):
 
-        # determine unique columns and ensure name is first for display purposes
-        source = list(self.network_feature.keys())
-        source.remove('name')
-        source = ['name']+source
-        source = OrderedDict(zip(source, [None]*len(source)))
-        for category in source.keys():
-            source[category] = self.entity.loc[self.entity['category']==category,'column'].unique()
-
         tooltips = """
         <div>
             <span style="font-size: 14px; color: blue;">Entity ID = @{Entity ID} </span>
@@ -152,7 +139,7 @@ class server():
             <span style="font-size: 12px;">@{{{feature}}}</span>
         </div>
         """
-        columns = list(chain.from_iterable(source.values()))
+        columns = list(chain.from_iterable(self.compared_columns.values()))
         tooltips += '\n'.join([detail.format(feature=feature) for feature in columns])
 
         return tooltips

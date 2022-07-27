@@ -1,12 +1,13 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
-from msilib import Feature
 from time import time
+from collections import OrderedDict
 
 import pandas as pd
 
-from entity_network import _index, _prepare, _compare, _helpers, _exceptions, network_ploter
+from entity_network import _index, _prepare, _compare, _helpers, _exceptions
+from entity_network.network_plotter import network_dashboard
 
-class entity_resolver():
+class entity_resolver(network_dashboard):
 
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
@@ -19,6 +20,7 @@ class entity_resolver():
         # outputs from compare method
         self.network_feature = {}
         self.similar_score = {}
+        self.compared_columns = OrderedDict([('name',None)])
         
         # outputs from network method
         self.network_feature = {}
@@ -41,7 +43,8 @@ class entity_resolver():
         # combine split columns, flatten into single
         print(f'Combining columns then flattening into single column: {columns}.')
         tstart = time()
-        self.processed[category] = _prepare.flatten(self._df, columns)
+        self.processed[category], compared = _prepare.flatten(self._df, columns)
+        self.compared_columns[category] = compared
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'flatten', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # clean column text
@@ -151,10 +154,14 @@ class entity_resolver():
         if 'name' in self.network_feature:
             self._entity()
 
+        # create summary of the network
+        self._summary()
+
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
 
         return self.network_id, self.network_map, self.network_feature
+
 
     def _entity(self):
 
@@ -175,13 +182,14 @@ class entity_resolver():
 
         # assign resolved entity to network map
         self.network_map['entity_id'] = entity_id
-    
-        # determine unique features belonging to an entity
-        self.entity = pd.DataFrame(columns=['entity_id','column','value','category'])
+
+        # determine unique features belonging to each entity
+        self.entity = pd.DataFrame(columns=['network_id','entity_id','category','column','value'])
         for category, feature in self.network_feature.items():
+            category_id = f'{category}_id'
             # determine matching column
-            details = self.network_map[['entity_id']]
-            details = details.merge(feature[['column']], on='node', how='left')
+            details = self.network_map[['network_id','entity_id']]
+            details = details.merge(feature[['column', category_id]], on='node', how='left')
             # add value from matching column
             # TODO: handle possibly two dataframes
             columns = details['column'].dropna().unique()
@@ -194,7 +202,18 @@ class entity_resolver():
             details['category'] = category
             # combine details from each features
             self.entity = pd.concat([self.entity, details])
+            self.entity[category_id] = self.entity[category_id].astype('Int64')
 
+    def _summary(self):
+
+        # TODO: include other variations of summerizing a network, including for two dataframes
+        # TODO: handle summary for network without an entity id
+        network_summary = self.network_map.groupby('network_id')
+        network_summary = network_summary.agg({'entity_id': 'nunique'})
+        network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
+        network_summary = network_summary.sort_values('entity_count', ascending=False)
+
+        self.network_summary = network_summary
 
     def debug_similar(self, category, cluster_edge_limit=5):
         
@@ -247,4 +266,6 @@ class entity_resolver():
 
     def plot_network(self):
         
-        network_ploter.server(self.network_map, self.network_feature, self.entity)
+        # network_ploter.server(self.network_map, self.network_feature, self.entity)
+
+        network_dashboard.__init__(self)
