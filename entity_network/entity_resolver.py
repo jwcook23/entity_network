@@ -63,7 +63,7 @@ class entity_resolver(network_dashboard):
         # find exact matches
         print(f'Finding exact matches for category: {category}.')
         tstart = time()
-        related_feature = _compare.exact_match(self.processed[category])
+        related_feature, df_exact = _compare.exact_match(self.processed[category])
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'exact_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # find similar matches
@@ -97,6 +97,15 @@ class entity_resolver(network_dashboard):
             tstart = time()
             related_feature, similar_feature = _compare.combined_id(related_feature, similar_feature, id_category)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'combined_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+
+            # include duplicated values in the first df related to a value in the second
+            fill = df_exact.merge(related_feature.set_index('node').drop(columns='column'), left_on='node_first', right_index=True)
+            fill = fill.drop(columns=['id','node_first'])
+            related_feature = pd.concat([related_feature, fill], ignore_index=True)
+
+            fill = df_exact.merge(similar_feature.set_index('node').drop(columns='column'), left_on='node_first', right_index=True)
+            fill = fill.drop(columns=['id','node_first'])
+            similar_feature = pd.concat([similar_feature, fill], ignore_index=True)
 
         # remove matches that do not match another index (can occur since multiple columns are flattened)
         print(f'Removing rows that only self-match for category: {category}.')

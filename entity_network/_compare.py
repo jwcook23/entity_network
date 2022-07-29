@@ -18,22 +18,32 @@ def exact_match(values):
 
     if values['df2'] is None:
         # compare values in single dataframe if that is all that is given
-        values = values['df']
+        compare = values['df']
+        df_exact = None
     else:
         # compare values in df and df2
-        values = pd.concat([
+        compare = pd.concat([
             values['df'][values['df'].isin(values['df2'])], 
             values['df2'][values['df2'].isin(values['df'])]
         ])
+        # exact matches in the first df to later combine with matches with the second df
+        df_exact = values['df'][values['df'].duplicated(keep=False)]
+        df_exact = df_exact.groupby(df_exact).ngroup()
+        df_exact.name = 'id'
+        df_exact = df_exact.reset_index()
+        fill = df_exact.groupby('id').nth(0)[['node']]
+        fill = fill.rename(columns={'node': 'node_first'})
+        df_exact = df_exact.merge(fill, on='id')
+        df_exact = df_exact[df_exact['node']!=df_exact['node_first']]
 
     # label exact matches with an id
-    related_feature = values[values.duplicated(keep=False) & values.notna()]
+    related_feature = compare[compare.duplicated(keep=False) & compare.notna()]
     related_feature = related_feature.groupby(related_feature)
     related_feature = related_feature.ngroup()
     related_feature = related_feature.reset_index()
     related_feature.columns = ['node','column','id_exact']
 
-    return related_feature
+    return related_feature, df_exact
 
 def create_tfidf(category, values, text_comparer, related_feature):
 
