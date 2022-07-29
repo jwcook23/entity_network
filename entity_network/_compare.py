@@ -3,7 +3,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import nmslib
 from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
-import usaddress
 
 from entity_network import _index
 
@@ -17,10 +16,11 @@ default_text_comparer = {
 
 def exact_match(values):
 
-    # compare values present in both dfs if two are given
     if values['df2'] is None:
+        # compare values in single dataframe if that is all that is given
         values = values['df']
     else:
+        # compare values in df and df2
         values = pd.concat([
             values['df'][values['df'].isin(values['df2'])], 
             values['df2'][values['df2'].isin(values['df'])]
@@ -150,15 +150,14 @@ def similar_id(similar_score, tfidf_index, threshold):
 
     return similar_feature
 
-
 def expand_score(similar_score, similar_feature, threshold):
 
     # convert from dictionary to dataframe
     similar_score = pd.DataFrame.from_dict(similar_score, orient='index', columns=['node', 'score'])
     similar_score.index.name = 'node_similar'
     similar_score = similar_score.apply(pd.Series.explode)
-    similar_score['node'] = similar_score['node'].astype('Int64')
-    similar_score['score'] = similar_score['score'].astype('Float64')
+    similar_score['node'] = similar_score['node'].astype('int64')
+    similar_score['score'] = similar_score['score'].astype('float64')
 
     # ignore self matchings records
     similar_score = similar_score[similar_score.index!=similar_score['node']]
@@ -225,32 +224,9 @@ def translate_index(related_feature, similar_score, index_mask, id_category):
     related_feature = related_feature.set_index('node')
     if similar_score is not None:
         similar_score = similar_score.reset_index()
-        similar_score = _index.original(similar_score, index_mask, index_name='node')
-        similar_score = _index.original(similar_score, index_mask, index_name='node_similar')
+        similar_score = _index.original(similar_score, index_mask)
+        # similar_score = _index.original(similar_score, index_mask, index_name='node_similar')
         similar_score = similar_score.set_index(['node','node_similar'])
 
+
     return related_feature, similar_score
-
-
-def address(values):
-
-    values = values.dropna()
-
-    # parse address components
-    try:
-        components0,_ = usaddress.tag(values[0])
-        components1,_ = usaddress.tag(values[1])
-    except usaddress.RepeatedLabelError:
-        return None, None
-
-    # determine difference in address components
-    components0 = set(components0.items())
-    components1 = set(components1.items())
-    diff0 = components0-components1
-    if len(diff0)==0:
-        diff0 = None
-    diff1 = components1-components0
-    if len(diff1)==0:
-        diff1 = None
-
-    return diff0, diff1

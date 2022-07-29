@@ -70,8 +70,9 @@ class network_dashboard():
 
     def plot_features(self):
 
-        pass
-        feature = self.entity[self.entity['network_id']==self.network_selected]
+        # self.entity[self.entity['network_id']==self.network_selected]
+        feature = None
+        return feature
 
     def node_details(self, G):
 

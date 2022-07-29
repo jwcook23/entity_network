@@ -65,10 +65,10 @@ def test_single_category_exact():
     # compare and derive network
     er = entity_resolver(sample_df)
     er.compare('phone', columns=columns['phone'])
-    network_id, network_map, _ = er.network()
+    er.network()
 
     # assert results
-    check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates)
+    check_network(er.network_id, er.network_map, columns, sample_id, sample_map, n_duplicates)
 
 
 def test_all_category_exact():
@@ -89,10 +89,10 @@ def test_all_category_exact():
     er = entity_resolver(sample_df)
     for category, cols in columns.items():
         er.compare(category, columns=cols, text_cleaner=None)
-    network_id, network_map, _ = er.network()
+    er.network()
 
     # assert results
-    check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates)
+    check_network(er.network_id, er.network_map, columns, sample_id, sample_map, n_duplicates)
 
 
 def test_two_dfs_exact():
@@ -113,10 +113,10 @@ def test_two_dfs_exact():
     er = entity_resolver(df1, df2)
     for category, cols in columns.items():
         er.compare(category, columns=cols)
-    network_id, network_map, _ = er.network()
+    er.network()
 
     # assert results
-    check_network(network_id, network_map, columns, sample_id, sample_map, n_duplicates)    
+    check_network(er.network_id, er.network_map, columns, sample_id, sample_map, n_duplicates)    
 
 
 def test_record_self_exact():
@@ -130,9 +130,9 @@ def test_record_self_exact():
     # compare and derive network
     er = entity_resolver(sample_df)
     er.compare('phone', columns=['PhoneA', 'PhoneB'])
-    network_id, network_map, network_feature = er.network()
+    er.network()
 
     # NameC should not self match
-    assert 2 not in network_id['df_index']
-    assert 2 not in network_map['df_index']
-    assert 2 not in network_feature['phone']['df_index']
+    assert 2 not in er.network_id['df_index']
+    assert 2 not in er.network_map['df_index']
+    assert 2 not in er.network_feature['phone']['df_index']

@@ -37,25 +37,14 @@ def test_similar_address():
 
     er = entity_resolver(df1, df2)
     er.compare('address', columns={'df': 'Address0', 'df2': 'Address1'}, threshold=0.7)
+    er.network()
 
-    network_id, _, _ = er.network()
-
-    expected = network_id.groupby('network_id')
-    list_notna = lambda l: [x for x in l if pd.notna(x)]
-    expected = expected.agg({
-        'df_index': list_notna,
-        'df2_index': list_notna
-    })
-
-
-    expected = expected.apply(pd.Series.explode)
-    missing_df = df1.index[~df1.index.isin(expected['df_index'])]
-    missing_df2 = df2.index[~df2.index.isin(expected['df2_index'])]
-
-    # comparison = er.index_comparison('address', index_df=missing_df, index_df2=missing_df2)
-    assert (expected['df_index']==expected['df2_index']).all()
-    assert len(missing_df)==0
-    assert len(missing_df2)==0
+    assert len(er.network_summary)==len(df)
+    assert df1.index.isin(er.network_summary['df_index']).all()
+    assert df2.index.isin(er.network_summary['df2_index']).all()
+    assert (er.network_summary['df_index']==er.network_summary['df2_index']).all()
+    assert (er.network_summary['df_feature']=='address').all()
+    assert (er.network_summary['df2_feature']=='address').all()
 
 
 def test_nothing_similar():
@@ -74,6 +63,8 @@ def test_nothing_similar():
 
     er = entity_resolver(df1, df2)
     er.compare('address', columns={'df': 'AddressA', 'df2': 'AddressA'}, threshold=0.8)
+
+    assert len(er.network_feature['address'])==0
 
 
 def test_combine_similar_exact():

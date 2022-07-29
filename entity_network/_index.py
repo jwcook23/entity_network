@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
@@ -65,28 +66,38 @@ def unique(df, df2):
 
     return dfs, index_mask
 
-
-def original(reindexed, index_mask, index_name = 'node'):
-
-    mask = index_mask['df'].copy()
-    if index_name=='node_similar':
-        mask.name = f'{mask.name}_similar'
-    reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
-    if is_numeric_dtype(index_mask['df']):
-        dtype = str(index_mask['df'].dtype).capitalize()
+def recast(reindexed, mask):
+    
+    if is_numeric_dtype(mask):
+        dtype = str(mask.dtype).capitalize()
     else:
-        dtype = str(index_mask['df'].dtype)
+        dtype = str(mask.dtype)
     reindexed[mask.name] = reindexed[mask.name].astype(dtype)
-    if index_mask['df2'] is not None:
-        mask = index_mask['df2'].copy()
-        if index_name=='node_similar':
-            mask.name = f'{mask.name}_similar'        
-        reindexed = reindexed.merge(mask, left_on=index_name, right_index=True, how='left')
-        if is_numeric_dtype(index_mask['df2']):
-            dtype = str(index_mask['df2'].dtype).capitalize()
+
+    return reindexed
+
+def original(reindexed, index_mask):
+
+    # if index_name=='node_similar':
+    #     mask.name = f'{mask.name}_similar'
+
+    # include the node index from the first df
+    mask = index_mask['df'].copy()
+    reindexed = reindexed.merge(mask, left_on='node', right_index=True, how='left')
+    reindexed = recast(reindexed, mask)
+    if 'node_similar' in reindexed and reindexed['node_similar'].isin(mask.index).any():
+        reindexed = reindexed.merge(mask, left_on='node_similar', right_index=True, how='left', suffixes=('','_similar'))
+        reindexed = recast(reindexed, mask)
+
+    # add index from the second dataframe
+    mask = index_mask['df2'].copy()
+    if mask is not None:
+        if 'node_similar' in reindexed:
+            reindexed = reindexed.merge(mask, left_on='node_similar', right_index=True, how='left')
+            reindexed = recast(reindexed, mask)
         else:
-            dtype = str(index_mask['df2'].dtype)
-        reindexed[mask.name] = reindexed[mask.name].astype(dtype)
+            reindexed = reindexed.merge(mask, left_on='node', right_index=True, how='left')
+            reindexed = recast(reindexed, mask)
 
     return reindexed
 
@@ -94,16 +105,9 @@ def original(reindexed, index_mask, index_name = 'node'):
 def network(df_id, df_feature, index_mask):
 
     # add original index in id dataframe
-    # df_id = df_id.merge(index_mask['df'], left_on='node', right_index=True, how='left')
-    # df_id['df_index'] = df_id['df_index'].astype('Int64')
-    # if index_mask['df2'] is not None:
-    #     df_id = df_id.merge(index_mask['df2'], left_on='node', right_index=True, how='left')
-    #     df_id['df2_index'] = df_id['df2_index'].astype('Int64')
     df_id = original(df_id, index_mask)
 
     # add original index in feature dataframe
-    # df_feature = df_feature.apply(pd.Series.explode)
-    # df_feature = df_feature.reset_index()
     df_feature = df_feature.merge(df_id.drop(columns=['network_id']), on='node')
 
     # remove artifical create index

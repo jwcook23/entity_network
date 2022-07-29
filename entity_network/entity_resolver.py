@@ -5,6 +5,7 @@ from collections import OrderedDict
 import pandas as pd
 
 from entity_network import _index, _prepare, _compare, _helpers, _exceptions
+from entity_network._difference import term_difference
 from entity_network.network_plotter import network_dashboard
 
 class entity_resolver(network_dashboard):
@@ -24,10 +25,7 @@ class entity_resolver(network_dashboard):
         
         # outputs from network method
         self.network_feature = {}
-        self.network_id, self.network_map = [None]*2
-
-        # outputs form entity method
-        # self.entity_feature, self.entity_id  = [None]*2
+        self.network_id, self.network_map, self.entity_map = [None]*3
         
         self.timer = pd.DataFrame(columns=['caller','file','method','category','time_seconds'])
 
@@ -119,11 +117,11 @@ class entity_resolver(network_dashboard):
         self.network_feature[category] = related_feature
 
         # add original index to processed values
-        self.processed[category]['df'] = self.processed[category]['df'].reset_index()
-        self.processed[category]['df'] = self.processed[category]['df'].merge(self._index_mask['df'], on='node')
-        if self._index_mask['df2']is not None:
-            self.processed[category]['df2'] = self.processed[category]['df2'].reset_index()
-            self.processed[category]['df2'] = self.processed[category]['df2'].merge(self._index_mask['df2'], on='node')
+        # self.processed[category]['df'] = self.processed[category]['df'].reset_index()
+        # self.processed[category]['df'] = self.processed[category]['df'].merge(self._index_mask['df'], on='node')
+        # if self._index_mask['df2']is not None:
+        #     self.processed[category]['df2'] = self.processed[category]['df2'].reset_index()
+        #     self.processed[category]['df2'] = self.processed[category]['df2'].merge(self._index_mask['df2'], on='node')
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
@@ -150,17 +148,18 @@ class entity_resolver(network_dashboard):
         self.network_id, self.network_map = _index.network(network_id, network_map, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'network', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
-        # resolve entity if needed
+        # resolve entity if needed names were also compared
         if 'name' in self.network_feature:
             self._entity()
 
-        # create summary of the network
-        self._summary()
+        # summerize the network
+        if self.entity_map is not None:
+            self.network_summary = self._summerize_entity()
+        else:
+            self.network_summary = self._summerize_dfs()
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
-
-        return self.network_id, self.network_map, self.network_feature
 
 
     def _entity(self):
@@ -184,7 +183,7 @@ class entity_resolver(network_dashboard):
         self.network_map['entity_id'] = entity_id
 
         # determine unique features belonging to each entity
-        self.entity = pd.DataFrame(columns=['network_id','entity_id','category','column','value'])
+        self.entity_map = pd.DataFrame(columns=['network_id','entity_id','category','column','value'])
         for category, feature in self.network_feature.items():
             category_id = f'{category}_id'
             # determine matching column
@@ -201,71 +200,94 @@ class entity_resolver(network_dashboard):
             # add source category
             details['category'] = category
             # combine details from each features
-            self.entity = pd.concat([self.entity, details])
-            self.entity[category_id] = self.entity[category_id].astype('Int64')
+            self.entity_map = pd.concat([self.entity_map, details])
+            self.entity_map[category_id] = self.entity_map[category_id].astype('Int64')
 
-    def _summary(self):
+    def _summerize_entity(self):
 
-        # TODO: include other variations of summerizing a network, including for two dataframes
-        # TODO: handle summary for network without an entity id
         network_summary = self.network_map.groupby('network_id')
         network_summary = network_summary.agg({'entity_id': 'nunique'})
         network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
         network_summary = network_summary.sort_values('entity_count', ascending=False)
 
-        self.network_summary = network_summary
+        return network_summary
+
+    def _summerize_dfs(self):
+
+        if 'df2_index' not in self.network_id:
+            network_summary = None
+            return network_summary
+
+        network_summary = self.network_id[['network_id','df_index']].dropna().groupby('network_id').agg({'df_index': list})
+        network_summary = network_summary.merge(
+            self.network_id[['network_id','df2_index']].dropna().groupby('network_id').agg({'df2_index': list}),
+            left_index=True, right_index=True
+        )
+        network_summary = network_summary.explode('df2_index')
+        network_summary = network_summary.explode('df_index')
+        feature = pd.DataFrame()
+        for category, data in self.network_feature.items():
+            source = data[['df_index']].dropna()
+            if len(source)>0:
+                source['df_feature'] = category
+                feature = pd.concat([feature, source], axis=0)
+            source = data[['df2_index']].dropna()
+            if len(source)>0:
+                source['df2_feature'] = category
+            feature = pd.concat([feature, source], axis=0)
+        network_summary = network_summary.merge(feature.groupby('df_index').agg({'df_feature': list}), on='df_index', how='left')
+        network_summary['df_feature'] = network_summary['df_feature'].apply(lambda x: ','.join(x))
+        network_summary = network_summary.merge(feature.groupby('df2_index').agg({'df2_feature': list}), on='df2_index', how='left')
+        network_summary['df2_feature'] = network_summary['df2_feature'].apply(lambda x: ','.join(x))
+
+        return network_summary
 
     def debug_similar(self, category, cluster_edge_limit=5):
+
+        # select similarity score for given category
+        score = self.similar_score[category]
         
-        comparer = {'address': _compare.address}
+        # set node and node_similar as columns for merging in processed values
+        score = score.reset_index()
 
-        # extra debugging info for given category
-        similar = self.similar_score[category]
+        # add the main processed/cleaned values from the first df
+        processed = self.processed[category]['df'].copy()
+        processed.name = f'{category}_df_value'
+        score = score.merge(processed, how='left', on=['node','column'])
 
-        # add processed values into similar score for the first dataframe
-        df_categories = {'exact': f'df_{category}', 'similar': f'df_{category}_similar'}
-        processed = self.processed[category]['df']
-        processed = processed[['df_index', category]].dropna(subset='df_index')
-        similar = similar.merge(
-            processed.rename(columns={category: df_categories['exact']}), 
-            on='df_index', how='left'
-        )
-        similar = similar.merge(
-            processed.rename(columns={category: df_categories['similar'], 'df_index': 'df_index_similar'}),
-            on='df_index_similar', how='left',
-        )
-        # add processed values into similar score for the second dataframe 
-        if self._index_mask['df2'] is None:
-            df2_categories = {'exact': None, 'similar': None}
+        # add the similar processed/cleaned values from the first or second df
+        if self.processed[category]['df2'] is None:
+            processed = self.processed[category]['df'].copy()
+            processed.name = f'{category}_df_similar_value'
+            score = score.merge(processed, how='left', left_on=['node_similar','column'], right_on=['node','column'])
         else:
-            df2_categories = {'exact': f'df2_{category}', 'similar': f'df2_{category}_similar'}
-            processed = self.processed[category][['df2_index',category]].dropna(subset='df2_index')
-            similar = similar.merge(
-                processed[['df2_index',category]].dropna().rename(columns={category: df2_categories['exact']}), 
-                on='df2_index', how='left'
-            )
-            similar = similar.merge(
-                processed.dropna().rename(columns={category: df2_categories['similar'], 'df2_index': 'df2_index_similar'}),
-                on='df2_index_similar', how='left',
-            )
+            processed = self.processed[category]['df2'].copy().reset_index()
+            processed = processed.rename(columns={'node': 'node_similar', category: f'{category}_df2_similar_value', 'column': 'column_df2'})
+            score = score.merge(processed, how='left', on='node_similar')            
 
-        # group by id and score
-        similar = similar.sort_values(by=['id_similar','score'], ascending=[True, False])
+        # remove columns used to track record and dataframe
+        score = score.set_index(keys=['node','node_similar'])
 
-        # split by in/out of cluster with closest distance to cluster edge appearing first and return comparison of difference
-        # TODO: provide a summary of differences
-        # TODO: provide elbow diagram of score to help determine where the threshold should be (change point)
-        columns = list(df_categories.values())+list(df2_categories.values())
-        columns = [x for x in columns if x is not None]
-        in_cluster = similar[similar['threshold']].sort_values(by='score', ascending=True).head(cluster_edge_limit)
-        in_cluster[f'{category}_difference'] = in_cluster[columns].apply(comparer[category], axis=1)
-        out_cluster = similar[~similar['threshold']].sort_values(by='score', ascending=False).head(cluster_edge_limit)
-        out_cluster[f'{category}_difference'] = out_cluster[columns].apply(comparer[category], axis=1)
+        # group similar values by id in order of decreasing similarity score
+        score = score.sort_values(by=['id_similar','score'], ascending=[True, False])
 
-        return similar, in_cluster, out_cluster
+        # find values closest to not being included
+        in_cluster = score[score['threshold']].sort_values(by='score', ascending=True)
+        in_cluster = in_cluster.head(cluster_edge_limit)
+        
+        # find records closest to belonging to a cluster
+        out_cluster = score[~score['threshold']].sort_values(by='score', ascending=False)
+        out_cluster = out_cluster.head(cluster_edge_limit)
+        
+        # calculate term difference between processed values for items nearest cluster edge
+        compare = score.columns[score.columns.str.endswith('_value')]
+        diff = compare.str.replace('_value$', '_diff', regex=True)
+        in_cluster[[diff[0],diff[1]]] = in_cluster[compare].apply(term_difference[category], axis=1, result_type='expand')
+        out_cluster[[diff[0],diff[1]]] = out_cluster[compare].apply(term_difference[category], axis=1, result_type='expand')
+
+
+        return score, in_cluster, out_cluster
 
     def plot_network(self):
-        
-        # network_ploter.server(self.network_map, self.network_feature, self.entity)
 
         network_dashboard.__init__(self)
