@@ -2,24 +2,11 @@ import re
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from entity_network import clean_text, _exceptions
+from entity_network import _exceptions
 
-default_text_cleaner = {
-    'name': clean_text.name,
-    'phone': clean_text.phone,
-    'email': clean_text.email,
-    'email_domain': clean_text.email_domain,
-    'address': clean_text.address
-}
-default_text_comparer = {
-    'name': 'char',
-    'phone': 'char',
-    'email': 'char',
-    'email_domain': 'char',
-    'address': 'word'
-}
 
-def unique(df, df2):
+def assign_node(df, df2):
+    '''Assign each record a unique node value. This allows for comparison using any input index data type.'''
 
     # make soft copy to preserve originals
     df = df.copy()
@@ -52,22 +39,12 @@ def unique(df, df2):
         dfs['df2'].index = index_mask['df2'].index
         dfs['df2'].index.name = 'node'
 
-    # df = df.copy()
-    # df.index = index_mask['df'].index
-    # if df2 is not None:
-    #     # start df2 index at end of df index
-    #     seed = len(index_mask['df'])
-    #     index_mask['df2'] = pd.Series(df2.index, index=range(seed, seed+len(df2)))
-    #     index_mask['df2'].name = 'df2_index'
-    #     df2 = df2.copy()
-    #     df2.index = index_mask['df2'].index
-    #     # stack df2 on each of df for a single df to be compared
-    #     df = pd.concat([df, df2])
-
     return dfs, index_mask
 
-def recast(reindexed, mask):
-    
+
+def _preserve_type(reindexed, mask):
+    '''Translate index back into the original data type but allow for nullable values.'''
+
     if is_numeric_dtype(mask):
         dtype = str(mask.dtype).capitalize()
     else:
@@ -76,28 +53,25 @@ def recast(reindexed, mask):
 
     return reindexed
 
-def original(reindexed, index_mask):
-
-    # if index_name=='node_similar':
-    #     mask.name = f'{mask.name}_similar'
+def assign_index(reindexed, index_mask):
 
     # include the node index from the first df
     mask = index_mask['df'].copy()
     reindexed = reindexed.merge(mask, left_on='node', right_index=True, how='left')
-    reindexed = recast(reindexed, mask)
+    reindexed = _preserve_type(reindexed, mask)
     if 'node_similar' in reindexed and reindexed['node_similar'].isin(mask.index).any():
         reindexed = reindexed.merge(mask, left_on='node_similar', right_index=True, how='left', suffixes=('','_similar'))
-        reindexed = recast(reindexed, mask)
+        reindexed = _preserve_type(reindexed, mask)
 
     # add index from the second dataframe
     if index_mask['df2'] is not None:
         mask = index_mask['df2'].copy()
         if 'node_similar' in reindexed:
             reindexed = reindexed.merge(mask, left_on='node_similar', right_index=True, how='left')
-            reindexed = recast(reindexed, mask)
+            reindexed = _preserve_type(reindexed, mask)
         else:
             reindexed = reindexed.merge(mask, left_on='node', right_index=True, how='left')
-            reindexed = recast(reindexed, mask)
+            reindexed = _preserve_type(reindexed, mask)
 
     return reindexed
 
@@ -105,7 +79,7 @@ def original(reindexed, index_mask):
 def network(df_id, df_feature, index_mask):
 
     # add original index in id dataframe
-    df_id = original(df_id, index_mask)
+    df_id = assign_index(df_id, index_mask)
 
     # add original index in feature dataframe
     df_feature = df_feature.merge(df_id.drop(columns=['network_id']), on='node')

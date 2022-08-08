@@ -231,13 +231,12 @@ def remove_self_matches(related_feature, similar_score, id_category):
 
 def translate_index(related_feature, similar_score, index_mask, id_category):
 
-    related_feature = _index.original(related_feature, index_mask)
+    related_feature = _index.assign_index(related_feature, index_mask)
     related_feature = related_feature.astype({'node': 'int64', 'column': 'string', 'id_exact': 'Int64', 'id_similar': 'Int64', id_category: 'int64'})
     related_feature = related_feature.set_index('node')
     if similar_score is not None:
         similar_score = similar_score.reset_index()
-        similar_score = _index.original(similar_score, index_mask)
-        # similar_score = _index.original(similar_score, index_mask, index_name='node_similar')
+        similar_score = _index.assign_index(similar_score, index_mask)
         similar_score = similar_score.set_index(['node','node_similar'])
 
 

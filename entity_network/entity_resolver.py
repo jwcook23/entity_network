@@ -4,8 +4,8 @@ from collections import OrderedDict
 
 import pandas as pd
 
-from entity_network import _index, _prepare, _compare, _helpers, _exceptions
-from entity_network._difference import term_difference
+from entity_network import _index, _prepare, _compare_records, _combine_connected, _exceptions
+from entity_network._find_difference import term_difference
 from entity_network.network_plotter import network_dashboard
 
 class entity_resolver(network_dashboard):
@@ -13,15 +13,15 @@ class entity_resolver(network_dashboard):
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
 
-        self._df, self._index_mask = _index.unique(df, df2)
+        self._df, self._index_mask = _index.assign_node(df, df2)
 
         # preprocessed text values
-        self.processed = {}
+        self._compared_values = {}
 
         # outputs from compare method
         self.network_feature = {}
-        self.similar_score = {}
-        self.compared_columns = OrderedDict([('name',None)])
+        self._similarity_score = {}
+        self._compared_columns = OrderedDict([('name',None)])
         
         # outputs from network method
         self.network_feature = {}
@@ -41,30 +41,30 @@ class entity_resolver(network_dashboard):
         # combine split columns, flatten into single
         print(f'Combining columns then flattening into single column: {columns}.')
         tstart = time()
-        self.processed[category], compared = _prepare.flatten(self._df, columns)
-        self.compared_columns[category] = compared
+        self._compared_values[category], compared = _prepare.flatten(self._df, columns)
+        self._compared_columns[category] = compared
         self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'flatten', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # clean column text
         if text_cleaner is not None:
             print(f'Cleaning category for comparison: {category}.')
             tstart = time()
-            for frame, values in self.processed[category].items():
+            for frame, values in self._compared_values[category].items():
                 if values is not None:
-                    self.processed[category][frame] = _prepare.clean(values, category, text_cleaner)
+                    self._compared_values[category][frame] = _prepare.clean(values, category, text_cleaner)
             self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_prepare', 'clean', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # set sources for tracability when comparing multiple categories
-        for frame, values in self.processed[category].items():
+        for frame, values in self._compared_values[category].items():
             if values is not None:
-                self.processed[category][frame].index.names = ('node', 'column')
-                self.processed[category][frame].name = category
+                self._compared_values[category][frame].index.names = ('node', 'column')
+                self._compared_values[category][frame].name = category
 
         # find exact matches
         print(f'Finding exact matches for category: {category}.')
         tstart = time()
-        related_feature, self._df_exact = _compare.exact_match(self.processed[category])
-        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'exact_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        related_feature, self._df_exact = _compare_records.exact_match(self._compared_values[category])
+        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'exact_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # find similar matches
         id_category = f'{category}_id'
@@ -75,28 +75,28 @@ class entity_resolver(network_dashboard):
         else:
             print(f'Creating tfidf for category: {category}.')
             tstart = time()
-            tfidf, tfidf_index = _compare.create_tfidf(category, self.processed[category], text_comparer, related_feature)
-            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'create_tfidf', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+            tfidf, tfidf_index = _compare_records.create_tfidf(category, self._compared_values[category], text_comparer, related_feature)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'create_tfidf', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Finding similar matches for category: {category}.')
             tstart = time()
-            similar_score = _compare.similar_match(tfidf, tfidf_index, kneighbors)
-            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'similar_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+            similar_score = _compare_records.similar_match(tfidf, tfidf_index, kneighbors)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'similar_match', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Assigning a similar ID for category: {category}.')
             tstart = time()
-            similar_feature = _compare.similar_id(similar_score, tfidf_index, threshold)
-            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'similar_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+            similar_feature = _compare_records.similar_id(similar_score, tfidf_index, threshold)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'similar_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Preparing similarity score for category: {category}.')
             tstart = time()
-            similar_score = _compare.expand_score(similar_score, similar_feature, threshold)
-            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'expand_score', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+            similar_score = _compare_records.expand_score(similar_score, similar_feature, threshold)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'expand_score', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             print(f'Determining overall ID using exact and similar for: {category}.')
             tstart = time()
-            related_feature, similar_feature = _compare.combined_id(related_feature, similar_feature, id_category)
-            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'combined_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+            related_feature, similar_feature = _compare_records.combined_id(related_feature, similar_feature, id_category)
+            self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'combined_id', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
             # include duplicated values in the first df related to a value in the second
             if self._df_exact is not None:
@@ -114,27 +114,27 @@ class entity_resolver(network_dashboard):
         # remove matches that do not match another index (can occur since multiple columns are flattened)
         print(f'Removing rows that only self-match for category: {category}.')
         tstart = time()
-        related_feature, similar_score = _compare.remove_self_matches(related_feature, similar_score, id_category)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'remove_self_matches', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        related_feature, similar_score = _compare_records.remove_self_matches(related_feature, similar_score, id_category)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'remove_self_matches', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # assign the original index
         print(f'Assigning the original input index for category: {category}.')
         tstart = time()
-        related_feature, similar_score = _compare.translate_index(related_feature, similar_score, self._index_mask, id_category)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare', 'translate_index', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        related_feature, similar_score = _compare_records.translate_index(related_feature, similar_score, self._index_mask, id_category)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['compare', '_compare_records', 'translate_index', category, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # store similarity for debugging
-        self.similar_score[category] = similar_score
+        self._similarity_score[category] = similar_score
 
         # store features for forming network and entity resolution
         self.network_feature[category] = related_feature
 
         # add original index to processed values
-        # self.processed[category]['df'] = self.processed[category]['df'].reset_index()
-        # self.processed[category]['df'] = self.processed[category]['df'].merge(self._index_mask['df'], on='node')
+        # self._compared_values[category]['df'] = self._compared_values[category]['df'].reset_index()
+        # self._compared_values[category]['df'] = self._compared_values[category]['df'].merge(self._index_mask['df'], on='node')
         # if self._index_mask['df2']is not None:
-        #     self.processed[category]['df2'] = self.processed[category]['df2'].reset_index()
-        #     self.processed[category]['df2'] = self.processed[category]['df2'].merge(self._index_mask['df2'], on='node')
+        #     self._compared_values[category]['df2'] = self._compared_values[category]['df2'].reset_index()
+        #     self._compared_values[category]['df2'] = self._compared_values[category]['df2'].merge(self._index_mask['df2'], on='node')
 
         # sort by most time intensive
         self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
@@ -147,14 +147,14 @@ class entity_resolver(network_dashboard):
         # form matrix of indices connected on any feature
         print('Combining matching features into a single matrix.')
         tstart = time()
-        network_map = _helpers.combine_features(self.network_feature)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'combine_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        network_map = _combine_connected.combine_features(self.network_feature)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_combine_connected', 'combine_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # determine an overall id using indices connected on any feature
         print('Assigning overall network ID.')
         tstart = time()
-        network_id, network_map = _helpers.overall_id(network_map)
-        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_helpers', 'overall_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
+        network_id, network_map = _combine_connected.overall_id(network_map)
+        self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_combine_connected', 'overall_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # add original index
         tstart = time()
@@ -258,13 +258,13 @@ class entity_resolver(network_dashboard):
     def debug_similar(self, category, cluster_edge_limit=5):
 
         # select similarity score for given category
-        score = self.similar_score[category]
+        score = self._similarity_score[category]
         
         # set node and node_similar as columns for merging in processed values
         score = score.reset_index()
 
         # add the main processed/cleaned values from the first df
-        processed = self.processed[category]['df'].copy()
+        processed = self._compared_values[category]['df'].copy()
         processed.name = f'{category}_df_value'
         # include exact matches within the first df
         if self._df_exact is not None:
@@ -277,12 +277,12 @@ class entity_resolver(network_dashboard):
         score = score.merge(processed, how='left', on=['node','column'])
 
         # add the similar processed/cleaned values from the first or second df
-        if self.processed[category]['df2'] is None:
-            processed = self.processed[category]['df'].copy()
+        if self._compared_values[category]['df2'] is None:
+            processed = self._compared_values[category]['df'].copy()
             processed.name = f'{category}_df_similar_value'
             score = score.merge(processed, how='left', left_on=['node_similar','column'], right_on=['node','column'])
         else:
-            processed = self.processed[category]['df2'].copy().reset_index()
+            processed = self._compared_values[category]['df2'].copy().reset_index()
             processed = processed.rename(columns={'node': 'node_similar', category: f'{category}_df2_similar_value', 'column': 'column_df2'})
             score = score.merge(processed, how='left', on='node_similar')            
 

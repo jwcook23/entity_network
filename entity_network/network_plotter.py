@@ -140,7 +140,7 @@ class network_dashboard():
             <span style="font-size: 12px;">@{{{feature}}}</span>
         </div>
         """
-        columns = list(chain.from_iterable(self.compared_columns.values()))
+        columns = list(chain.from_iterable(self._compared_columns.values()))
         tooltips += '\n'.join([detail.format(feature=feature) for feature in columns])
 
         return tooltips

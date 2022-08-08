@@ -1,4 +1,4 @@
-import sample
+from . import sample
 
 from entity_network.entity_resolver import entity_resolver
 
