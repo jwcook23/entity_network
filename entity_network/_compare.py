@@ -35,6 +35,8 @@ def exact_match(values):
         fill = fill.rename(columns={'node': 'node_first'})
         df_exact = df_exact.merge(fill, on='id')
         df_exact = df_exact[df_exact['node']!=df_exact['node_first']]
+        # set the index as the first node for a group of exact matches
+        df_exact = df_exact.set_index(keys='node_first')
 
     # label exact matches with an id
     related_feature = compare[compare.duplicated(keep=False) & compare.notna()]
@@ -166,8 +168,8 @@ def expand_score(similar_score, similar_feature, threshold):
     similar_score = pd.DataFrame.from_dict(similar_score, orient='index', columns=['node', 'score'])
     similar_score.index.name = 'node_similar'
     similar_score = similar_score.apply(pd.Series.explode)
-    similar_score['node'] = similar_score['node'].astype('int64')
-    similar_score['score'] = similar_score['score'].astype('float64')
+    similar_score['node'] = similar_score['node'].astype('Int64')
+    similar_score['score'] = similar_score['score'].astype('Float64')
 
     # ignore self matchings records
     similar_score = similar_score[similar_score.index!=similar_score['node']]

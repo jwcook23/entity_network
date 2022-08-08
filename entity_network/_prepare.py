@@ -46,10 +46,9 @@ def flatten(df, columns):
                 cols[idx] = combined
 
         # # check presence of columns
-        # cols = pd.Series(cols)
-        # missing = cols[~cols.isin(df)]
-        # if any(missing):
-        #     raise _exceptions.MissingColumn(f'Argument columns not in DataFrame: {missing.tolist()}')
+        missing = [x for x in cols if x not in df[frame]]
+        if len(missing)>0:
+            raise _exceptions.MissingColumn(f'Argument columns not in DataFrame: {missing}')
 
         # track columns that were compared in a standard format
         compared[frame] = cols

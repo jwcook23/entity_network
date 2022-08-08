@@ -90,8 +90,8 @@ def original(reindexed, index_mask):
         reindexed = recast(reindexed, mask)
 
     # add index from the second dataframe
-    mask = index_mask['df2'].copy()
-    if mask is not None:
+    if index_mask['df2'] is not None:
+        mask = index_mask['df2'].copy()
         if 'node_similar' in reindexed:
             reindexed = reindexed.merge(mask, left_on='node_similar', right_index=True, how='left')
             reindexed = recast(reindexed, mask)
