@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from entity_network import _combine_connected
+from entity_network import _network_helpers
 
 def test_two_cols():
     df = pd.DataFrame([
@@ -12,7 +12,7 @@ def test_two_cols():
     df[['node','0_id','1_id']] = df[['node','0_id','1_id']].astype('Int64')
     df['network_id'] = df['network_id'].astype('int32')
 
-    network_id, network_map = _combine_connected.overall_id(df.drop(columns='network_id').copy())
+    network_id, network_map = _network_helpers.overall_id(df.drop(columns='network_id').copy())
     assert network_id.equals(df[['node','network_id']])
     assert network_map.equals(df)
 
@@ -30,7 +30,7 @@ def test_two_cols_nans():
     df[['node','0_id','1_id']] = df[['node','0_id','1_id']].astype('Int64')
     df['network_id'] = df['network_id'].astype('int32')
 
-    network_id, network_map = _combine_connected.overall_id(df.drop(columns='network_id').copy())
+    network_id, network_map = _network_helpers.overall_id(df.drop(columns='network_id').copy())
     assert network_id.equals(df[['node','network_id']])
     assert network_map.equals(df)
 
@@ -49,7 +49,7 @@ def test_three_cols():
     df[['node','0_id','1_id','2_id']] = df[['node','0_id','1_id','2_id']].astype('Int64')
     df['network_id'] = df['network_id'].astype('int32')
 
-    network_id, network_map = _combine_connected.overall_id(df.drop(columns='network_id').copy())
+    network_id, network_map = _network_helpers.overall_id(df.drop(columns='network_id').copy())
     assert network_id.equals(df[['node','network_id']])
     assert network_map.equals(df)
 
@@ -71,6 +71,6 @@ def test_large_matrix():
     df[['node','0_id','1_id']] = df[['node','0_id','1_id']].astype('Int64')
     df['network_id'] = df['network_id'].astype('int32')
 
-    network_id, network_map = _combine_connected.overall_id(df.drop(columns='network_id').copy())
+    network_id, network_map = _network_helpers.overall_id(df.drop(columns='network_id').copy())
     assert network_id.equals(df[['node','network_id']])
     assert network_map.equals(df[network_map.columns])

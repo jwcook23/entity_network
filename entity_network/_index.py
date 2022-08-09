@@ -43,7 +43,7 @@ def assign_node(df, df2):
 
 
 def _preserve_type(reindexed, mask):
-    '''Translate index back into the original data type but allow for nullable values.'''
+    '''Translate index back into the original data type and allow for nullable numeric types.'''
 
     if is_numeric_dtype(mask):
         dtype = str(mask.dtype).capitalize()
@@ -74,18 +74,3 @@ def assign_index(reindexed, index_mask):
             reindexed = _preserve_type(reindexed, mask)
 
     return reindexed
-
-
-def network(df_id, df_feature, index_mask):
-
-    # add original index in id dataframe
-    df_id = assign_index(df_id, index_mask)
-
-    # add original index in feature dataframe
-    df_feature = df_feature.merge(df_id.drop(columns=['network_id']), on='node')
-
-    # remove artifical create index
-    df_id = df_id.set_index('node')
-    df_feature = df_feature.set_index('node')
-
-    return df_id, df_feature

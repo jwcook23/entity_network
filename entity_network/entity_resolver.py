@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pandas as pd
 
-from entity_network import _index, _prepare, _compare_records, _combine_connected, _exceptions
+from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions
 from entity_network._find_difference import term_difference
 from entity_network.network_plotter import network_dashboard
 
@@ -147,113 +147,31 @@ class entity_resolver(network_dashboard):
         # form matrix of indices connected on any feature
         print('Combining matching features into a single matrix.')
         tstart = time()
-        network_map = _combine_connected.combine_features(self.network_feature)
+        self.network_map = _network_helpers.combine_features(self.network_feature)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_combine_connected', 'combine_features', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # determine an overall id using indices connected on any feature
         print('Assigning overall network ID.')
         tstart = time()
-        network_id, network_map = _combine_connected.overall_id(network_map)
+        self.network_id, self.network_map = _network_helpers.overall_id(self.network_map)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_combine_connected', 'overall_id', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
         # add original index
         tstart = time()
-        self.network_id, self.network_map = _index.network(network_id, network_map, self._index_mask)
+        self.network_id, self.network_map = _network_helpers.original_index(self.network_id, self.network_map, self._index_mask)
         self.timer = pd.concat([self.timer, pd.DataFrame([['network', '_index', 'network', None, time()-tstart]], columns=self.timer.columns)], ignore_index=True)
 
-        # resolve entity if needed names were also compared
+        # resolve entities if names were compared
         if 'name' in self.network_feature:
-            self._entity()
+            self.entity_map, self.network_map = _network_helpers.resolve_entity(self.network_map, self.network_feature, self._df['df'])
 
-        # summerize the network
-        if self.entity_map is not None:
-            self.network_summary = self._summerize_entity()
+        # summerize the network by connections or by entity if names were compared
+        if self.entity_map is None:
+            self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature)
         else:
-            self.network_summary = self._summerize_dfs()
+            self.network_summary = _network_helpers.summerize_entity(self.network_map)
+            
 
-        # sort by most time intensive
-        self.timer = self.timer.sort_values(by='time_seconds', ascending=False)
-
-
-    def _entity(self):
-
-        # assume similar names in the same network are the same entity
-        # TODO: require a single matching feature instead of the entire network?
-        entity_id = self.network_map[['network_id']].merge(
-            self.network_feature['name'][['name_id']], 
-            left_index=True, right_index=True, how='left'
-        )
-        entity_id = entity_id.groupby(['network_id','name_id']).ngroup()
-
-        # assume entity_id without a name_id
-        assume = entity_id==-1
-        seed = entity_id.max()+1
-        if pd.isna(seed):
-            seed = 0
-        entity_id[assume] = range(seed, seed+sum(assume))
-
-        # assign resolved entity to network map
-        self.network_map['entity_id'] = entity_id
-
-        # determine unique features belonging to each entity
-        self.entity_map = pd.DataFrame(columns=['network_id','entity_id','category','column','value'])
-        for category, feature in self.network_feature.items():
-            category_id = f'{category}_id'
-            # determine matching column
-            details = self.network_map[['network_id','entity_id']]
-            details = details.merge(feature[['column', category_id]], on='node', how='left')
-            # add value from matching column
-            # TODO: handle possibly two dataframes
-            columns = details['column'].dropna().unique()
-            value = self._df['df'][columns].stack()
-            value.name = 'value'
-            details = details.merge(value, left_on=['node','column'], right_index=True)
-            # remove duplicated info
-            details = details.drop_duplicates()
-            # add source category
-            details['category'] = category
-            # combine details from each features
-            self.entity_map = pd.concat([self.entity_map, details])
-            self.entity_map[category_id] = self.entity_map[category_id].astype('Int64')
-
-    def _summerize_entity(self):
-
-        network_summary = self.network_map.groupby('network_id')
-        network_summary = network_summary.agg({'entity_id': 'nunique'})
-        network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
-        network_summary = network_summary.sort_values('entity_count', ascending=False)
-
-        return network_summary
-
-    def _summerize_dfs(self):
-
-        if 'df2_index' not in self.network_id:
-            network_summary = None
-            return network_summary
-
-        network_summary = self.network_id[['network_id','df_index']].dropna().groupby('network_id').agg({'df_index': list})
-        network_summary = network_summary.merge(
-            self.network_id[['network_id','df2_index']].dropna().groupby('network_id').agg({'df2_index': list}),
-            left_index=True, right_index=True
-        )
-        network_summary = network_summary.explode('df2_index')
-        network_summary = network_summary.explode('df_index')
-        feature = pd.DataFrame()
-        for category, data in self.network_feature.items():
-            source = data[['df_index']].dropna()
-            if len(source)>0:
-                source['df_feature'] = category
-                feature = pd.concat([feature, source], axis=0)
-            source = data[['df2_index']].dropna()
-            if len(source)>0:
-                source['df2_feature'] = category
-            feature = pd.concat([feature, source], axis=0)
-        network_summary = network_summary.merge(feature.groupby('df_index').agg({'df_feature': list}), on='df_index', how='left')
-        network_summary['df_feature'] = network_summary['df_feature'].apply(lambda x: ','.join(x))
-        network_summary = network_summary.merge(feature.groupby('df2_index').agg({'df2_feature': list}), on='df2_index', how='left')
-        network_summary['df2_feature'] = network_summary['df2_feature'].apply(lambda x: ','.join(x))
-
-        return network_summary
 
     def debug_similar(self, category, cluster_edge_limit=5):
 
