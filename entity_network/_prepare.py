@@ -10,7 +10,7 @@ default_text_cleaner = {
     'address': clean_text.address
 }
 
-def flatten(df, columns):
+def flatten(df, columns, category):
 
     values = {'df': None, 'df2': None}
     compared = {'df': [None], 'df2': [None]}
@@ -55,6 +55,8 @@ def flatten(df, columns):
 
         # prepare multiple columns by pivoting into a single column
         values[frame] = df[frame][cols].stack()
+        values[frame].index.names = ('node', 'column')
+        values[frame].name = category
 
     # return a flat list of compared values
     compared = list(chain.from_iterable(compared.values()))
@@ -63,16 +65,24 @@ def flatten(df, columns):
     return values, compared
 
 
-def clean(values, category, text_cleaner):
+def clean(dfs, category, text_cleaner):
 
     # check allowed category argument for default cleaner
     if category not in default_text_cleaner:
         raise _exceptions.InvalidCategory(f"Argument catgeory must be one of {list(default_text_cleaner.keys())} when text_cleaner=='default'.")
 
-    # preprocess values by category type
-    if text_cleaner=='default':
-        values = default_text_cleaner[category](values)
-    else:
-        values = text_cleaner(values)
+    for frame, values in dfs.items():
+        if values is not None:
 
-    return values
+            # preprocess values by category type
+            if text_cleaner=='default':
+                values = default_text_cleaner[category](values)
+            else:
+                values = text_cleaner(values)
+
+            # for merging dataframes, preserve series name regardless of text_cleaner function
+            values.name = category
+
+            dfs[frame] = values
+
+    return dfs

@@ -22,7 +22,7 @@ def combine_features(relationships):
 
     return network_map
 
-def overall_id(network_map):
+def assign_id(network_map):
     
     # assume an initial temp id to find connected components of
     id_cols = network_map.columns[network_map.columns.str.endswith('_id')]
@@ -54,7 +54,7 @@ def overall_id(network_map):
 
     return network_id, network_map
 
-def original_index(network_id, network_map, index_mask):
+def translate_index(network_id, network_map, index_mask):
 
     network_id = _index.assign_index(network_id, index_mask)
     network_map = network_map.merge(network_id.drop(columns=['network_id']), on='node')

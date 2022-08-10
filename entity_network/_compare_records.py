@@ -47,6 +47,23 @@ def exact_match(values):
 
     return related_feature, df_exact
 
+def fill_exact(related_feature, similar_score, exact):
+
+    if exact is not None:
+        fill = related_feature.set_index('node').drop(columns='column')
+        fill = exact.merge(fill, left_index=True, right_index=True)
+        fill = fill.drop(columns='id')
+        related_feature = pd.concat([related_feature, fill], ignore_index=True)
+
+        fill = similar_score.reset_index().set_index('node').drop(columns='column')
+        fill = exact.merge(fill, left_index=True, right_index=True)
+        fill = fill.set_index('node_similar')
+        fill = fill.drop(columns='id')
+        similar_score = pd.concat([similar_score, fill], ignore_index=False)
+
+    return related_feature, similar_score
+
+
 def create_tfidf(category, values, text_comparer, related_feature):
 
     # remove duplicates and nulls to lower kneighbors parameter needed
@@ -218,7 +235,7 @@ def combined_id(related_feature, similar_feature, id_category):
 
     return related_feature, similar_feature
 
-def remove_self_matches(related_feature, similar_score, id_category):
+def remove_self(related_feature, similar_score, id_category):
 
     remove_index = related_feature.reset_index().groupby(id_category).agg({'node': 'nunique'})
     remove_index = remove_index[remove_index['node']==1].index
