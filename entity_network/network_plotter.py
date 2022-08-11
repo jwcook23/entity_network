@@ -76,7 +76,7 @@ class network_dashboard():
 
     def node_details(self, G):
 
-        entity = self.entity[self.entity['network_id']==self.network_selected]
+        entity = self.entity_map[self.entity_map['network_id']==self.network_selected]
         entity = entity.groupby(['entity_id', 'column'])
         entity = entity.agg({'value': 'unique'})
         entity['value'] = entity['value'].apply(lambda x: '<br>'.join(x))

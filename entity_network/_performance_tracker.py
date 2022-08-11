@@ -18,7 +18,7 @@ class operation_tracker():
     def track(self, caller, file, function, description):
 
         # calculate time in seconds since last invocation
-        duration = time()-self.timer_start
+        duration = round(time()-self.timer_start,4)
 
         # print to standard out for users to track long running processes
         print(f'caller={caller}, file={file}, function={function}, description={description}, duration_seconds={duration}')

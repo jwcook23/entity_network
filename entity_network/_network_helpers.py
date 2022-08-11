@@ -106,11 +106,25 @@ def resolve_entity(network_map, network_feature, df):
     return entity_map, network_map
 
 
-def summerize_entity(network_map):
+def summerize_entity(network_map, compared_columns, df):
 
-    network_summary = network_map.groupby('network_id')
-    network_summary = network_summary.agg({'entity_id': 'nunique'})
-    network_summary = network_summary.rename(columns={'entity_id': 'entity_count'})
+    # rename / create columns for pandas aggregation
+    network_summary = network_map.copy()
+    columns = network_summary.columns.drop('network_id')
+    columns = columns[columns.str.endswith('_id')]
+    renamed = {c:c.replace('_id',' Count').capitalize() for c in columns}
+    network_summary = network_summary.rename(columns=renamed)
+    network_summary['Entity common'] = network_summary['Entity count']
+
+    # aggreate number of unique values and most common value
+    agg = {k:'nunique' for k in renamed.values()}
+    agg['Entity common'] = pd.Series.mode
+    network_summary = network_summary.groupby('network_id')
+    network_summary = network_summary.agg(agg)
+
+    # add the common name to the network summary
+
+    # sort by largest network of entities
     network_summary = network_summary.sort_values('entity_count', ascending=False)
 
     return network_summary

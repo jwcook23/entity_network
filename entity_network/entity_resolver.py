@@ -131,7 +131,7 @@ class entity_resolver(operation_tracker, network_dashboard):
             self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature)
             self.track('network', '_network_helpers', 'summerize_connections', None)
         else:
-            self.network_summary = _network_helpers.summerize_entity(self.network_map)
+            self.network_summary = _network_helpers.summerize_entity(self.network_map, self._compared_columns, self._df['df'])
             self.track('network', '_network_helpers', 'summerize_entity', None)
             
 
