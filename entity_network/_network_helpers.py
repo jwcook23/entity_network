@@ -130,32 +130,44 @@ def summerize_entity(network_map, compared_columns, df):
     return network_summary
 
 
-def summerize_connections(network_id, network_feature):
+def summerize_connections(network_id, network_feature, processed):
     
+    # TODO: implement single df summary
     if 'df2_index' not in network_id:
         network_summary = None
         return network_summary
 
-    network_summary = network_id[['network_id','df_index']].dropna().groupby('network_id').agg({'df_index': list})
-    network_summary = network_summary.merge(
-        network_id[['network_id','df2_index']].dropna().groupby('network_id').agg({'df2_index': list}),
-        left_index=True, right_index=True
-    )
+    # use the first dataframe as the primary dataframe to summerize
+    network_summary = network_id[['network_id','df_index']].dropna()
+    network_summary = network_summary.groupby('network_id').agg({'df_index': list})
+
+    # add index from the second dataframe that are in the same network in the first dataframe
+    other = network_id[['network_id','df2_index']].dropna()
+    other = other.groupby('network_id').agg({'df2_index': list})
+    network_summary = network_summary.merge(other, left_index=True, right_index=True, how='inner')
+
+    # expand indices to add details
     network_summary = network_summary.explode('df2_index')
     network_summary = network_summary.explode('df_index')
-    feature = pd.DataFrame()
+
+    # determine the category(s) matched and add the processed values
     for category, data in network_feature.items():
-        source = data[['df_index']].dropna()
-        if len(source)>0:
-            source['df_feature'] = category
-            feature = pd.concat([feature, source], axis=0)
-        source = data[['df2_index']].dropna()
-        if len(source)>0:
-            source['df2_feature'] = category
-        feature = pd.concat([feature, source], axis=0)
-    network_summary = network_summary.merge(feature.groupby('df_index').agg({'df_feature': list}), on='df_index', how='left')
+        for frame in ['df','df2']:
+            # select values from the current dataframe
+            source = data[[f'{frame}_index']].dropna()
+            if len(source)>0:
+                # add processed values
+                source = source.merge(processed[category][frame], on='node')
+                source.columns = [f'{frame}_index', f'{frame}_value']
+                # add category label
+                source[f'{frame}_feature'] = category
+                # aggreate by frame index
+                source = source.groupby(f'{frame}_index')
+                source = source.agg({f'{frame}_feature': list, f'{frame}_value': list})
+                network_summary = network_summary.merge(source, on=f'{frame}_index', how='left')
+
+    # add a combined list of matching category(s) concatenated with a comma
     network_summary['df_feature'] = network_summary['df_feature'].apply(lambda x: ','.join(x))
-    network_summary = network_summary.merge(feature.groupby('df2_index').agg({'df2_feature': list}), on='df2_index', how='left')
     network_summary['df2_feature'] = network_summary['df2_feature'].apply(lambda x: ','.join(x))
 
     return network_summary

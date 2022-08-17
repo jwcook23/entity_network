@@ -128,7 +128,7 @@ class entity_resolver(operation_tracker, network_dashboard):
 
         # summerize the network by connections or by entity if names were compared
         if self.entity_map is None:
-            self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature)
+            self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature, self._compared_values)
             self.track('network', '_network_helpers', 'summerize_connections', None)
         else:
             self.network_summary = _network_helpers.summerize_entity(self.network_map, self._compared_columns, self._df['df'])
