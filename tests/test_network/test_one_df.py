@@ -88,7 +88,7 @@ def test_all_category_exact():
     # compare and derive network
     er = entity_resolver(sample_df)
     for category, cols in columns.items():
-        er.compare(category, columns=cols, text_cleaner=None)
+        er.compare(category, columns=cols)
     er.network()
 
     # assert results

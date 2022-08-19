@@ -1,14 +1,6 @@
 from itertools import chain
 
-from entity_network import clean_text, _exceptions
-
-default_text_cleaner = {
-    'name': clean_text.name,
-    'phone': clean_text.phone,
-    'email': clean_text.email,
-    'email_domain': clean_text.email_domain,
-    'address': clean_text.address
-}
+from entity_network import _exceptions
 
 def flatten(df, columns, category):
 
@@ -67,18 +59,11 @@ def flatten(df, columns, category):
 
 def clean(dfs, category, text_cleaner):
 
-    # check allowed category argument for default cleaner
-    if category not in default_text_cleaner:
-        raise _exceptions.InvalidCategory(f"Argument catgeory must be one of {list(default_text_cleaner.keys())} when text_cleaner=='default'.")
-
     for frame, values in dfs.items():
         if values is not None:
 
             # preprocess values by category type
-            if text_cleaner=='default':
-                values = default_text_cleaner[category](values)
-            else:
-                values = text_cleaner(values)
+            values = text_cleaner(values)
 
             # for merging dataframes, preserve series name regardless of text_cleaner function
             values.name = category

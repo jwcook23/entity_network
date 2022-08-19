@@ -45,9 +45,9 @@ def test_address_one_df(df_samples):
     assert similar['df_index_similar'].equals(pd.Series([0,2,1,1,0,2], dtype='int64'))
 
     assert len(in_cluster)==2
-    assert pd.Series(['address_df_diff','address_df_similar_diff']).isin(in_cluster.columns).all()
+    assert 'difference' in in_cluster.columns
     assert len(out_cluster)==4
-    assert pd.Series(['address_df_diff','address_df_similar_diff']).isin(out_cluster.columns).all()
+    assert 'difference' in out_cluster.columns
 
 
 def test_address_two_df(df_samples):
@@ -70,6 +70,6 @@ def test_address_two_df(df_samples):
     assert similar['df2_index'].equals(pd.Series([0,0,0,1,1], dtype='Int64'))
 
     assert len(in_cluster)==4
-    assert pd.Series(['address_df_diff','address_df2_similar_diff']).isin(in_cluster.columns).all()
+    assert 'difference' in in_cluster.columns
     assert len(out_cluster)==1
-    assert pd.Series(['address_df_diff','address_df2_similar_diff']).isin(out_cluster.columns).all()
+    assert 'difference' in out_cluster.columns

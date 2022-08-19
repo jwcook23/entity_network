@@ -1,6 +1,6 @@
 import pandas as pd
 
-from entity_network._find_difference import term_difference
+from entity_network import _find_difference
 
 def first_df(score, processed, category, exact):
     
@@ -54,8 +54,7 @@ def cluster_edge(score, cluster_edge_limit):
 def record_difference(score, in_cluster, out_cluster, category):
 
     compare = score.columns[score.columns.str.endswith('_value')]
-    diff = compare.str.replace('_value$', '_diff', regex=True)
-    in_cluster[[diff[0],diff[1]]] = in_cluster[compare].apply(term_difference[category], axis=1, result_type='expand')
-    out_cluster[[diff[0],diff[1]]] = out_cluster[compare].apply(term_difference[category], axis=1, result_type='expand')
+    in_cluster['difference'] = in_cluster[compare].apply(_find_difference.main, args=(category,), axis=1)
+    out_cluster['difference'] = out_cluster[compare].apply(_find_difference.main, args=(category,), axis=1)
 
     return in_cluster, out_cluster

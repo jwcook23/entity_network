@@ -1,9 +1,10 @@
 '''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from collections import OrderedDict
+import json
 
 import pandas as pd
 
-from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions, _debug
+from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions, _debug, settings
 from entity_network._performance_tracker import operation_tracker
 from entity_network.network_plotter import network_dashboard
 
@@ -12,6 +13,10 @@ class entity_resolver(operation_tracker, network_dashboard):
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
 
+        # read global settings file
+        self.settings = settings
+
+        # assign globally unique node value
         self._df, self._index_mask = _index.assign_node(df, df2)
 
         # preprocessed text values
@@ -23,13 +28,12 @@ class entity_resolver(operation_tracker, network_dashboard):
         self._compared_columns = OrderedDict([('name',None)])
         
         # outputs from network method
-        self.network_feature = {}
         self.network_id, self.network_map, self.entity_map = [None]*3
 
         # initialize performance time tracking and logging
         operation_tracker.__init__(self)
 
-    def compare(self, category, columns, threshold:float=1, kneighbors:int=10, text_comparer='default', text_cleaner='default'):
+    def compare(self, category, columns, threshold:float=1, kneighbors:int=10):
 
         # input arguments
         if not isinstance(kneighbors, int) or kneighbors<0:
@@ -45,9 +49,9 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.track('compare', '_prepare', 'flatten', category)
 
         # clean column text
-        if text_cleaner is not None:
-            self._compared_values[category] = _prepare.clean(self._compared_values[category], category, text_cleaner)
-            self.track('compare', '_prepare', 'clean', category)
+        text_cleaner = self.settings.text_cleaner[category]
+        self._compared_values[category] = _prepare.clean(self._compared_values[category], category, text_cleaner)
+        self.track('compare', '_prepare', 'clean', category)
 
         # find exact matches
         related_feature, self._df_exact = _compare_records.exact_match(self._compared_values[category])
@@ -64,7 +68,8 @@ class entity_resolver(operation_tracker, network_dashboard):
         else:
 
             # create term frequency–inverse document frequency matrix to numerically compare text
-            tfidf, tfidf_index = _compare_records.create_tfidf(category, self._compared_values[category], text_comparer, related_feature)
+            text_comparer = self.settings.text_comparer[category]
+            tfidf, tfidf_index = _compare_records.create_tfidf(self._compared_values[category], text_comparer)
             self.track('compare', '_compare_records', 'create_tfidf', category)
 
             # find similar text values using a non-blocking k-nearest neighbor approach

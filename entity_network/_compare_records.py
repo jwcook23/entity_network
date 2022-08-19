@@ -6,14 +6,6 @@ from scipy.sparse.csgraph import connected_components
 
 from entity_network import _index
 
-default_text_comparer = {
-    'name': 'char',
-    'phone': 'char',
-    'email': 'char',
-    'email_domain': 'char',
-    'address': 'word'
-}
-
 def exact_match(values):
 
     if values['df2'] is None:
@@ -64,7 +56,7 @@ def fill_exact(related_feature, similar_score, exact):
     return related_feature, similar_score
 
 
-def create_tfidf(category, values, text_comparer, related_feature):
+def create_tfidf(values, text_comparer):
 
     # remove duplicates and nulls to lower kneighbors parameter needed
     for frame in values.keys():
@@ -76,8 +68,6 @@ def create_tfidf(category, values, text_comparer, related_feature):
             values[frame] = values[frame].dropna()
 
     # define vectorizer to transform text to numbers
-    if text_comparer=='default':
-        text_comparer = default_text_comparer[category]
     vectorizer = TfidfVectorizer(
         # create features using words or characters
         analyzer=text_comparer,

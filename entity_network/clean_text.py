@@ -127,8 +127,8 @@ def phone(values: pd.Series, stopwords='default') -> pd.Series:
     # remove trailing zeros with decimal from mixed types
     prepared = prepared.replace('\.0$', '', regex=True)
 
-    # keep numbers only
-    prepared = prepared.replace(r'[^0-9]+', '', regex=True)
+    # keep numbers and spaces only
+    prepared = prepared.replace(r'[^0-9\s]+', '', regex=True)
 
     return _common_poststeps(prepared)
 
