@@ -4,7 +4,8 @@ import json
 
 import pandas as pd
 
-from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions, _debug, settings
+from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions, _debug
+from entity_network.clean_text import settings
 from entity_network._performance_tracker import operation_tracker
 from entity_network.network_plotter import network_dashboard
 
@@ -36,8 +37,8 @@ class entity_resolver(operation_tracker, network_dashboard):
     def compare(self, category, columns, threshold:float=1, kneighbors:int=10):
 
         # input arguments
-        if not category in settings.text.keys():
-            raise _exceptions.InvalidCategory(f'Argument category must be one of {list(settings.text.keys())}')
+        if not category in settings.keys():
+            raise _exceptions.InvalidCategory(f'Argument category must be one of {list(settings.keys())}')
         if not isinstance(kneighbors, int) or kneighbors<0:
             raise _exceptions.KneighborsRange('Argument kneighbors must be a positive integer.')
         if threshold<=0 or threshold>1:
@@ -51,7 +52,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.track('compare', '_prepare', 'flatten', category)
 
         # clean column text
-        text_cleaner = self.settings.text[category]['cleaner']
+        text_cleaner = self.settings[category]['cleaner']
         self._compared_values[category] = _prepare.clean(self._compared_values[category], category, text_cleaner)
         self.track('compare', '_prepare', 'clean', category)
 
@@ -70,7 +71,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         else:
 
             # create term frequency–inverse document frequency matrix to numerically compare text
-            text_comparer = self.settings.text[category]['comparer']
+            text_comparer = self.settings[category]['comparer']
             tfidf, tfidf_index = _compare_records.create_tfidf(self._compared_values[category], text_comparer)
             self.track('compare', '_compare_records', 'create_tfidf', category)
 

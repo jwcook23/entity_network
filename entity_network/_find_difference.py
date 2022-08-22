@@ -1,9 +1,8 @@
 from itertools import chain
 from collections import Counter
 
-from entity_network import settings
-
-import usaddress
+from entity_network.clean_text import settings
+from entity_network import parse_components
 
 def main(values, category):
 
@@ -32,7 +31,7 @@ def _term_diff(values):
 def common(values, category):
 
     # split by characeters or words
-    if settings.text[category]['comparer']=='word':
+    if settings[category]['comparer']=='word':
         values = [val.split(' ') for val in values]
     else:
         values = [list(val) for val in values]
@@ -47,15 +46,7 @@ def common(values, category):
 
 def address(values):
 
-    # parse address components into a flattened list
-    parsed = []
-    for val in values:
-        try:
-            components,_ = usaddress.tag(val)
-            components = set(components.items())
-        except usaddress.RepeatedLabelError:
-            components = {'RepeatedLabelError': None}
-        parsed += components
+    parsed = parse_components.address(values)
 
     # find terms only appearing once
     difference = _term_diff(parsed)    

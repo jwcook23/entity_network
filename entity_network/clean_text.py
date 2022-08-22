@@ -1,27 +1,11 @@
 '''Text cleaning functions for different categories of data.'''
 import pandas as pd
-from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
 import flashtext
+from sklearn.feature_extraction._stop_words import ENGLISH_STOP_WORDS
+
+from entity_network import parse_components
 
 # TODO: investigate cleantext https://pypi.org/project/clean-text/
-
-default_stopwords = {
-    'name': list(ENGLISH_STOP_WORDS),
-    'phone': [
-        # words containing only one repeating digit
-        r'^(\d)\1+$'
-    ],
-    # TODO: remove email domains from email comparison
-    'email': ['noreply@noreply.com'],
-    'email_domain': [
-        # common domains
-        '.com','.net','.org',
-        # common domain names
-        'gmail', 'yahoo', 'hotmail','aol','msn','noreply','comcast','outlook',
-        'att','verizon','icloud',
-    ],
-    'address': list(ENGLISH_STOP_WORDS)
-}
 
 
 def _alphanumeric_only(prepared):
@@ -57,7 +41,7 @@ def _remove_stopwords(prepared, stopwords, category):
     if stopwords is None:
         return prepared
     elif stopwords=='default':
-        stopwords = default_stopwords[category]
+        stopwords = settings[category]['stopwords']
     
     pattern = r'\b(?:{})\b'.format('|'.join(stopwords))
     prepared = prepared.str.replace(pattern, '', regex=True)
@@ -117,18 +101,19 @@ def phone(values: pd.Series, stopwords='default') -> pd.Series:
     prepared (pd.Series) : values after processing
     '''
 
-    # TODO: allow stripping leading digit
-
     prepared = _common_presteps(values)
 
     # manually remove stopwords, as TfidfVectorizer stopwords only applys if analyzer='word'
     prepared = _remove_stopwords(prepared, stopwords, 'phone')
 
-    # remove trailing zeros with decimal from mixed types
-    prepared = prepared.replace('\.0$', '', regex=True)
+    # parse using external library
+    prepared = prepared.apply(parse_components.phone)
 
-    # keep numbers and spaces only
-    prepared = prepared.replace(r'[^0-9\s]+', '', regex=True)
+    # # remove trailing zeros with decimal from mixed types
+    # prepared = prepared.replace('\.0$', '', regex=True)
+
+    # # keep numbers and spaces only
+    # prepared = prepared.replace(r'[^0-9\s]+', '', regex=True)
 
     return _common_poststeps(prepared)
 
@@ -245,3 +230,38 @@ def address(values: pd.Series, stopwords='default') -> pd.Series:
     prepared = prepared.replace(to_replace=r'^\D+', value='', regex=True)
 
     return _common_poststeps(prepared)
+
+settings = {
+    "name": {
+        "comparer": "char", 
+        "cleaner": name,
+        "stopwords": list(ENGLISH_STOP_WORDS)
+    },
+    "phone": {
+        "comparer": "word", 
+        "cleaner": phone,
+        "stopwords": [
+            r'^(\d)\1+$'
+        ]
+    },
+    "email": {
+        "comparer": "char", 
+        "cleaner": email,
+        "stopwords": [
+            'noreply@noreply.com'
+        ]
+    },
+    "email_domain": {
+        "comparer": "char", 
+        "cleaner": email_domain,
+        "stopwords": [
+            '.com','.net','.org',
+            'gmail', 'yahoo', 'hotmail','aol','msn','noreply','comcast','outlook', 'att','verizon','icloud',
+        ]
+    },
+    "address": {
+        "comparer": "word",
+        "cleaner": address,
+        "stopwords": list(ENGLISH_STOP_WORDS)
+    }
+}
