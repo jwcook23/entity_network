@@ -140,29 +140,45 @@ def summerize_connections(network_id, network_feature, processed):
         network_summary = None
         return network_summary
 
-    # find matched columns and differences between values
-    network_summary = pd.DataFrame()
-    for category, feature in network_feature.items():
+    # summerize network by index
+    network_summary = network_id.groupby('network_id')
+    list_notna = lambda x: list(x.dropna())
+    network_summary = network_summary.agg({'df_index': list_notna, 'df2_index': list_notna})
+    network_summary['feature'] = ''
 
+    # find matched categories and differences between values
+    column_feature = []
+    for category, feature in network_feature.items():
         # determine column name and add processed values
         feature = feature[['column']]
         feature = pd.concat([
             feature.merge(processed[category]['df'], on=['node','column'], how='inner'),
             feature.merge(processed[category]['df2'], on=['node','column'], how='inner'),
         ])
-        # feature = feature.merge(network_id[['network_id']], on='node', how='inner')
-        feature = feature.merge(network_id, on='node', how='inner')
+        feature = feature.drop(columns='column')
+        feature = feature.merge(network_id[['network_id']], on='node', how='inner')
         feature = feature.groupby('network_id')
-        feature = feature.agg({'df_index': lambda x: list(x.dropna()), 'df2_index': lambda x: list(x.dropna()), 'column': list, category: list})
-
+        feature = feature.agg({category: list})
         # calculate term differences
         feature['difference'] = feature[category].apply(_find_difference.main, args=(category,))
+        # feature = feature.drop(columns=category)
+        # set a matching feature column
+        column = f'{category}_feature'
+        column_feature+=[column] 
+        feature[column] = category
 
-        # removed processed value and keep record of category
-        feature = feature.drop(columns=category)
-        network_summary = pd.concat([network_summary, feature])
+        # add values into network summary
+        column = f'{category}_difference'
+        feature = feature.rename(columns={'difference': column})
+        network_summary = network_summary.merge(feature, on='network_id', how='left')
+        network_summary[column] = network_summary[column].fillna('')
 
-    print(1)
+    # form a single comma seperated feature column
+    network_summary['feature'] = network_summary[column_feature].apply(lambda x: ','.join(x), axis='columns')
+    network_summary['feature'] = network_summary['feature'].str.replace(',{2,}', ',', regex=True)
+    network_summary = network_summary.drop(columns=column_feature)
+
+    return network_summary
 
 # def summerize_connections(network_id, network_feature, processed):
     

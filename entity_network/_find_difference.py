@@ -17,6 +17,9 @@ def main(values, category):
     else:
         difference = common(values, category)
 
+    if len(difference)==0:
+        difference = None
+
     return difference
 
 def _term_diff(values):
@@ -29,7 +32,7 @@ def _term_diff(values):
 def common(values, category):
 
     # split by characeters or words
-    if settings.text_comparer[category]=='word':
+    if settings.text[category]['comparer']=='word':
         values = [val.split(' ') for val in values]
     else:
         values = [list(val) for val in values]
@@ -55,6 +58,6 @@ def address(values):
         parsed += components
 
     # find terms only appearing once
-    difference = _term_diff(values)    
+    difference = _term_diff(parsed)    
 
     return difference

@@ -1,9 +1,0 @@
-{
-    "text_comparer": {
-        "name": "char",
-        "phone": "char",
-        "email": "char",
-        "email_domain": "char",
-        "address": "word"
-    }
-}
