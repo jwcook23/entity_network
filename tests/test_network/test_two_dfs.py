@@ -95,8 +95,8 @@ def test_similar_address():
 
 def test_similar_phone():
 
-    df1 = pd.DataFrame({'MainPhone': ['123-456-7890']})
-    df2 = pd.DataFrame({'WorkPhone': ['123-456-7890 123']})
+    df1 = pd.DataFrame({'MainPhone': ['555-456-7890']})
+    df2 = pd.DataFrame({'WorkPhone': ['555-456-7890 extension 123']})
 
     er = entity_resolver(df1, df2)
     er.compare('phone', columns={'df': 'MainPhone', 'df2': 'WorkPhone'}, threshold=0.5)

@@ -157,19 +157,15 @@ def summerize_connections(network_id, network_feature, processed):
         ])
         feature = feature.drop(columns='column')
         feature = feature.merge(network_id[['network_id']], on='node', how='inner')
-        feature = feature.groupby('network_id')
-        feature = feature.agg({category: list})
-        # calculate term differences
-        feature['difference'] = feature[category].apply(_find_difference.main, args=(category,))
-        # feature = feature.drop(columns=category)
+        # group values by id and calculate term differences
+        feature = feature.set_index('network_id')
+        feature = _find_difference.main(feature[category], category)
         # set a matching feature column
         column = f'{category}_feature'
         column_feature+=[column] 
         feature[column] = category
 
         # add values into network summary
-        column = f'{category}_difference'
-        feature = feature.rename(columns={'difference': column})
         network_summary = network_summary.merge(feature, on='network_id', how='left')
         network_summary[column] = network_summary[column].fillna('')
 

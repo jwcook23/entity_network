@@ -50,20 +50,19 @@ def test_phone():
         "111111111",
         "",
         "Some Name",
-        '(1) 123-456-6879 ext 12'
+        '(1) 555-456-7890 extension 12'
     ])
 
     prepared = clean_text.phone(values)
 
-    assert prepared.equals(
-        pd.Series([
-            "123456789",
-            pd.NA,
-            pd.NA,
-            pd.NA,
-            "1123456687912"
-        ], dtype='string')
-    )
+    expected = pd.Series([
+        "1 123456789",
+        pd.NA,
+        pd.NA,
+        pd.NA,
+        "1 5554567890 ext 12"
+    ], dtype='string')
+    assert prepared.equals(expected)
 
 
 def test_email():

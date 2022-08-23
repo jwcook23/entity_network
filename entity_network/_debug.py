@@ -53,8 +53,19 @@ def cluster_edge(score, cluster_edge_limit):
 
 def record_difference(score, in_cluster, out_cluster, category):
 
+    # find columns containing values to compare
     compare = score.columns[score.columns.str.endswith('_value')]
-    in_cluster['difference'] = in_cluster[compare].apply(_find_difference.main, args=(category,), axis=1)
-    out_cluster['difference'] = out_cluster[compare].apply(_find_difference.main, args=(category,), axis=1)
+
+    # find term difference for in cluster values
+    values = in_cluster[compare].stack().reset_index(level=1, drop=True)
+    values.index.name = 'node'
+    values = _find_difference.main(values, category)
+    in_cluster[f'{category}_difference'] = values[f'{category}_difference']
+
+    # find term difference for out cluster values
+    values = out_cluster[compare].stack().reset_index(level=1, drop=True)
+    values.index.name = 'node'
+    values = _find_difference.main(values, category)
+    out_cluster[f'{category}_difference'] = values[f'{category}_difference']
 
     return in_cluster, out_cluster

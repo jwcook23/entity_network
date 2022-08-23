@@ -46,6 +46,8 @@ def _remove_stopwords(prepared, stopwords, category):
     pattern = r'\b(?:{})\b'.format('|'.join(stopwords))
     prepared = prepared.str.replace(pattern, '', regex=True)
 
+    # prepared[prepared==''] = pd.NA
+
     return prepared
 
 
@@ -107,14 +109,9 @@ def phone(values: pd.Series, stopwords='default') -> pd.Series:
     prepared = _remove_stopwords(prepared, stopwords, 'phone')
 
     # parse using external library
-    prepared = prepared.apply(parse_components.phone)
-
-    # # remove trailing zeros with decimal from mixed types
-    # prepared = prepared.replace('\.0$', '', regex=True)
-
-    # # keep numbers and spaces only
-    # prepared = prepared.replace(r'[^0-9\s]+', '', regex=True)
-
+    prepared = parse_components.phone(prepared)
+    prepared = prepared['parsed']
+    
     return _common_poststeps(prepared)
 
 

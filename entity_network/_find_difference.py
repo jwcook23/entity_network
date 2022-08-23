@@ -1,54 +1,36 @@
-from itertools import chain
 from collections import Counter
+from itertools import chain
 
 from entity_network.clean_text import settings
 from entity_network import parse_components
 
 def main(values, category):
 
-    # if multiple columns from a df, combine into a list
-    if not isinstance(values, list):
-        values = list(chain(*values.values))
-
-    # apply category specific or general difference finder
+    # apply category specific or general component parser
     if category=='address':
-        difference = address(values)
+        parsed = parse_components.address(values)
+    elif category=='phone':
+        parsed = parse_components.phone(values)
     else:
-        difference = common(values, category)
+        parsed = parse_components.common(values, delimiter=settings[category]['comparer'])
 
-    if len(difference)==0:
-        difference = None
+    # group components to compare
+    values = parsed.groupby(values.index.name)
+    values = values.agg({'parsed': list,'components': list})
 
-    return difference
+    # calculate the difference in components
+    values['components'] = values['components'].apply(_term_diff)
+
+    # rename columns to reflect category for later merging and after difference is found
+    values = values.rename(columns={'parsed': category, 'components': f'{category}_difference'})
+
+    return values
 
 def _term_diff(values):
 
-    frequency = Counter(values)
+    frequency = Counter(chain(*values))
     difference = [key for key,val in frequency.items() if val==1]
-
-    return difference
-
-def common(values, category):
-
-    # split by characeters or words
-    if settings[category]['comparer']=='word':
-        values = [val.split(' ') for val in values]
-    else:
-        values = [list(val) for val in values]
-
-    # form a flatten list
-    values = list(chain(*values))
-
-    # find terms only appearing once
-    difference = _term_diff(values)
-
-    return difference
-
-def address(values):
-
-    parsed = parse_components.address(values)
-
-    # find terms only appearing once
-    difference = _term_diff(parsed)    
+    if len(difference)==0:
+        difference = None
 
     return difference
