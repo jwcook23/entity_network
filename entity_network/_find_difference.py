@@ -8,21 +8,25 @@ def main(values, category):
 
     # apply category specific or general component parser
     if category=='address':
-        parsed = parse_components.address(values)
+        parsed = parse_components.address(values[category])
     elif category=='phone':
-        parsed = parse_components.phone(values)
+        parsed = parse_components.phone(values[category])
     else:
-        parsed = parse_components.common(values, delimiter=settings[category]['comparer'])
+        delimiter = settings[category]['comparer']
+        parsed = parse_components.common(values[category], delimiter=delimiter)
+
+    # include original matched column
+    parsed['column'] = values['source']+'.'+values['column']
 
     # group components to compare
     values = parsed.groupby(values.index.name)
-    values = values.agg({'parsed': list,'components': list})
+    values = values.agg({'parsed': list, 'components': list, 'column': list})
 
     # calculate the difference in components
     values['components'] = values['components'].apply(_term_diff)
 
     # rename columns to reflect category for later merging and after difference is found
-    values = values.rename(columns={'parsed': category, 'components': f'{category}_difference'})
+    values = values.rename(columns={'parsed': category, 'components': f'{category}_difference', 'column': f'{category}_column'})
 
     return values
 
