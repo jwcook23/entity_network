@@ -162,17 +162,20 @@ def summerize_connections(network_id, network_feature, processed):
         feature = _find_difference.main(feature[category], category)
         # set a matching feature column
         column = f'{category}_feature'
-        column_feature+=[column] 
+        column_feature+=[column]
         feature[column] = category
 
         # add values into network summary
         network_summary = network_summary.merge(feature, on='network_id', how='left')
+        empty = feature.columns.drop(column)
+        network_summary[empty] = network_summary[empty].where(pd.notnull(network_summary[empty]), None)
         network_summary[column] = network_summary[column].fillna('')
 
     # form a single comma seperated feature column
     network_summary[column_feature] = network_summary[column_feature].fillna('')
     network_summary['feature'] = network_summary[column_feature].apply(lambda x: ','.join(x), axis='columns')
     network_summary['feature'] = network_summary['feature'].str.replace(',{2,}', ',', regex=True)
+    network_summary['feature'] = network_summary['feature'].str.replace('^,|,$', '', regex=True)
     network_summary = network_summary.drop(columns=column_feature)
 
     return network_summary
