@@ -15,16 +15,18 @@ def _to_frame(values):
 
 def common(values, delimiter):
 
-    # # split by characeters or words
-    # if delimiter=='word':
-    #     values = [val.split(' ') for val in values]
-    # else:
-    #     values = [list(val) for val in values]
+    # split by characeters or words
+    if delimiter=='word':
+        components = values.str.split(' ')
+        components = components.apply(lambda x: set(x))
+    else:
+        components = values.apply(lambda x: set(x))
 
-    # # form a flatten list
-    # values = list(chain(*values))
+    components.name = 'components'
+    components = pd.DataFrame(components)
+    components['parsed'] = values
 
-    raise NotImplementedError('common component parser not yet implemented')
+    return components
 
 def phone(values):
 
