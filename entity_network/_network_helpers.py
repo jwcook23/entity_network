@@ -144,7 +144,7 @@ def summerize_connections(network_id, network_feature, processed):
     network_summary = network_id.groupby('network_id')
     list_notna = lambda x: list(x.dropna())
     network_summary = network_summary.agg({'df_index': list_notna, 'df2_index': list_notna})
-    network_summary['feature'] = ''
+    network_summary['feature_match'] = ''
 
     # find matched categories and differences between values
     column_feature = []
@@ -173,9 +173,9 @@ def summerize_connections(network_id, network_feature, processed):
 
     # form a single comma seperated feature column
     network_summary[column_feature] = network_summary[column_feature].fillna('')
-    network_summary['feature'] = network_summary[column_feature].apply(lambda x: ','.join(x), axis='columns')
-    network_summary['feature'] = network_summary['feature'].str.replace(',{2,}', ',', regex=True)
-    network_summary['feature'] = network_summary['feature'].str.replace('^,|,$', '', regex=True)
+    network_summary['feature_match'] = network_summary[column_feature].apply(lambda x: ','.join(x), axis='columns')
+    network_summary['feature_match'] = network_summary['feature_match'].str.replace(',{2,}', ',', regex=True)
+    network_summary['feature_match'] = network_summary['feature_match'].str.replace('^,|,$', '', regex=True)
     network_summary = network_summary.drop(columns=column_feature)
 
     return network_summary

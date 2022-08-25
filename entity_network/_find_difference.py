@@ -16,10 +16,7 @@ def main(values, category):
         parsed = parse_components.common(values[category], delimiter=delimiter)
 
     # alias names for later merges that include multiple categories
-    alias = {
-        'df_column': f'{category}_df_column',
-        'parsed': category, 'components': f'{category}_difference'
-    }
+    alias = {'parsed': f'{category}_normalized', 'components': f'{category}_difference'}
 
     # include source column descriptions if provided
     summary = {'parsed': list, 'components': list}
@@ -27,11 +24,11 @@ def main(values, category):
     if 'df2_column' in values:
         parsed['df2_column'] = values['df2_column']
         summary = {**{'df2_column': list_notna}, **summary}
-        alias = {**{'df2_column': f'{category}_df2_column'}, **alias}
+        alias = {**{'df2_column': f'df2_column_{category}'}, **alias}
     if 'df_column' in values:
         parsed['df_column'] = values['df_column']
         summary = {**{'df_column': list_notna}, **summary}
-        alias = {**{'df_column': f'{category}_df_column'}, **alias}
+        alias = {**{'df_column': f'df_column_{category}'}, **alias}
 
     # group components by id
     values = parsed.groupby(values.index.name)
