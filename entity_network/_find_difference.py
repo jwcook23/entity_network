@@ -15,18 +15,33 @@ def main(values, category):
         delimiter = settings[category]['comparer']
         parsed = parse_components.common(values[category], delimiter=delimiter)
 
-    # include original matched column
-    parsed['column'] = values['source']+'.'+values['column']
+    # alias names for later merges that include multiple categories
+    alias = {
+        'df_column': f'{category}_df_column',
+        'parsed': category, 'components': f'{category}_difference'
+    }
 
-    # group components to compare
+    # include source column descriptions if provided
+    summary = {'parsed': list, 'components': list}
+    list_notna = lambda x: list(x.dropna())
+    if 'df2_column' in values:
+        parsed['df2_column'] = values['df2_column']
+        summary = {**{'df2_column': list_notna}, **summary}
+        alias = {**{'df2_column': f'{category}_df2_column'}, **alias}
+    if 'df_column' in values:
+        parsed['df_column'] = values['df_column']
+        summary = {**{'df_column': list_notna}, **summary}
+        alias = {**{'df_column': f'{category}_df_column'}, **alias}
+
+    # group components by id
     values = parsed.groupby(values.index.name)
-    values = values.agg({'parsed': list, 'components': list, 'column': list})
+    values = values.agg(summary)
 
     # calculate the difference in components
     values['components'] = values['components'].apply(_term_diff)
 
     # rename columns to reflect category for later merging and after difference is found
-    values = values.rename(columns={'parsed': category, 'components': f'{category}_difference', 'column': f'{category}_column'})
+    values = values.rename(columns=alias)
 
     return values
 

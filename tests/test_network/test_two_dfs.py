@@ -91,7 +91,9 @@ def test_similar_address():
     assert (er.network_summary['df2_index'].explode().sort_values()==df2.index).all()
     assert (er.network_summary['df_index']==er.network_summary['df2_index']).all()
     assert (er.network_summary['feature']=='address').all()
-    assert pd.Series(['address','address_difference']).isin(er.network_summary.columns).all()
+    assert er.network_summary.columns.equals(
+        pd.Index(['df_index', 'df2_index', 'feature', 'address_df_column', 'address_df2_column', 'address', 'address_difference'])
+    )
 
 def test_similar_phone():
 
@@ -107,7 +109,9 @@ def test_similar_phone():
     assert (er.network_summary['df2_index'].explode().sort_values()==df2.index).all()
     assert (er.network_summary['df_index']==er.network_summary['df2_index']).all()
     assert (er.network_summary['feature']=='phone').all()
-    assert pd.Series(['phone','phone_difference']).isin(er.network_summary.columns).all()
+    assert er.network_summary.columns.equals(
+        pd.Index(['df_index', 'df2_index', 'feature', 'phone_df_column', 'phone_df2_column', 'phone', 'phone_difference'])
+    )
 
 def test_nothing_similar():
 

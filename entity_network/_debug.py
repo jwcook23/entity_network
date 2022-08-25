@@ -57,13 +57,15 @@ def record_difference(score, in_cluster, out_cluster, category):
     compare = score.columns[score.columns.str.endswith('_value')]
 
     # find term difference for in cluster values
-    values = in_cluster[compare].stack().reset_index(level=1, drop=True)
+    values = pd.DataFrame(in_cluster[compare].stack(), columns=[category])
+    values = values.reset_index(level=1, drop=True)
     values.index.name = 'node'
     values = _find_difference.main(values, category)
     in_cluster[f'{category}_difference'] = values[f'{category}_difference']
 
     # find term difference for out cluster values
-    values = out_cluster[compare].stack().reset_index(level=1, drop=True)
+    values = pd.DataFrame(out_cluster[compare].stack(), columns=[category])
+    values = values.reset_index(level=1, drop=True)
     values.index.name = 'node'
     values = _find_difference.main(values, category)
     out_cluster[f'{category}_difference'] = values[f'{category}_difference']

@@ -152,9 +152,9 @@ def summerize_connections(network_id, network_feature, processed):
         # determine column name and add processed values
         feature = feature[['column']]
         df = feature.merge(processed[category]['df'], on=['node','column'], how='inner')
-        df['source'] = 'df'
+        df = df.rename(columns={'column': 'df_column'})
         df2 = feature.merge(processed[category]['df2'], on=['node','column'], how='inner')
-        df2['source'] = 'df2'
+        df2 = df2.rename(columns={'column': 'df2_column'})
         feature = pd.concat([df,df2])
         feature = feature.merge(network_id[['network_id']], on='node', how='inner')
         # group values by id and calculate term differences
