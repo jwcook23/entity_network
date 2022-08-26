@@ -45,8 +45,6 @@ def main(values, category):
 def _term_diff(values):
 
     frequency = Counter(chain(*values))
-    difference = [key for key,val in frequency.items() if val==1]
-    if len(difference)==0:
-        difference = None
+    difference = ['='.join(key) for key,val in frequency.items() if val==1 and key[1] is not None]
 
     return difference

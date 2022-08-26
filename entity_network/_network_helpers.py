@@ -160,6 +160,10 @@ def summerize_connections(network_id, network_feature, processed):
         # group values by id and calculate term differences
         feature = feature.set_index('network_id')
         feature = _find_difference.main(feature, category)
+        # combine features in delimited format for external source use
+        for col in feature.columns:
+            feature[col] = feature[col].apply(lambda x: ','.join(x))
+
         # set a matching feature column
         column = f'{category}_feature'
         column_feature+=[column]
