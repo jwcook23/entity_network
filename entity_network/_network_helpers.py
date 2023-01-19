@@ -12,9 +12,9 @@ def combine_features(relationships):
 
     network_map = pd.DataFrame(columns=['node'])
     for category, related in relationships.items():
-        if category=='name':
-            # use all features besides name for forming network
-            continue
+        # if category=='name':
+        #     # use all features besides name for forming network
+        #     continue
         id_category = f'{category}_id'
         related = related[[id_category]].copy()
         related = related.reset_index()
@@ -65,6 +65,7 @@ def translate_index(network_id, network_map, index_mask):
     network_map = network_map.set_index('node')
 
     return network_id, network_map
+
 
 def resolve_entity(network_map, network_feature, df):
     # assume similar names in the same network are the same entity

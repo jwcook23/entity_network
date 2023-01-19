@@ -70,6 +70,24 @@ def possible_stopwords(values) -> pd.Series:
     return possible_stopwords
 
 
+def alphanumeric(values: pd.Series) -> pd.Series:
+    '''Prepocess generic string containing characters and numbers only.
+
+    Parameters
+    ----------
+    values (pd.Series) : values before processing
+
+    Returns
+    -------
+    prepared (pd.Series) : values after processing
+    '''  
+
+    prepared = _common_presteps(values)
+    prepared = _alphanumeric_only(prepared)
+
+    return _common_poststeps(prepared)
+    
+
 def name(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess comapany and person names.
 
@@ -228,7 +246,13 @@ def address(values: pd.Series, stopwords='default') -> pd.Series:
 
     return _common_poststeps(prepared)
 
+
 comparison_rules = {
+    "alphanumeric": {
+        "comparer": "word",
+        "cleaner": alphanumeric,
+        "stopwords": None
+    },
     "name": {
         "comparer": "char", 
         "cleaner": name,

@@ -22,10 +22,12 @@ class entity_resolver(operation_tracker, network_dashboard):
         df (pandas.DataFrame): first dataframe containing entity features
         df2 (pandas.DataFrame, default=None): second dataframe containing entity features
 
-        Properties
+        Properties TODO: document important class properties
         ----------
         er.network_id (pd.DataFrame): 
         er.network_map (pd.DataFrame):
+        er.network_feature (pd.DataFrame):
+        er.similarity_score (pd.DataFrame)
         er.entity_map (pd.DataFrame | None): 
         er.network_summary (pd.DataFrame): 
 
@@ -75,7 +77,7 @@ class entity_resolver(operation_tracker, network_dashboard):
 
         # outputs from compare method
         self.network_feature = {}
-        self._similarity_score = {}
+        self.similarity_score = {}
         self._compared_columns = OrderedDict([('name',None)])
         
         # outputs from network method
@@ -90,9 +92,9 @@ class entity_resolver(operation_tracker, network_dashboard):
 
         Parameters
         ----------
-        category (str): 
-        columns (str|list|dict): 
-        thresold (float, default=1): 
+        category (str): alphanumeric, name, phone, email, email_domain, or address
+        columns (str|list|dict): columns in the first/second dataframe to compare for each category
+        thresold (float, default=1): find values that exactly match (1) or within similar threshold (>0 to <1)
         kneighbors (int): TODO: test and document affect of kneighbors
 
         Examples
@@ -187,7 +189,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.track('compare', '_compare_records', 'translate_index', category)
 
         # store similarity for debugging
-        self._similarity_score[category] = similar_score
+        self.similarity_score[category] = similar_score
 
         # store features for forming network and entity resolution
         self.network_feature[category] = related_feature
@@ -243,24 +245,24 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.network_id, self.network_map = _network_helpers.translate_index(self.network_id, self.network_map, self._index_mask)
         self.track('network', '_network_helpers', 'translate_index', None)
 
-        # resolve entities if names were compared
-        if 'name' in self.network_feature:
-            self.entity_map, self.network_map = _network_helpers.resolve_entity(self.network_map, self.network_feature, self._df['df'])
-            self.track('network', '_network_helpers', 'resolve_entity', None)
-
         # summerize the network by connections or by entity if names were compared
-        if self.entity_map is None:
-            self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature, self._compared_values)
-            self.track('network', '_network_helpers', 'summerize_connections', None)
-        else:
-            self.network_summary = _network_helpers.summerize_entity(self.network_map, self._compared_columns, self._df['df'])
-            self.track('network', '_network_helpers', 'summerize_entity', None)
+        # if self.entity_map is None:
+        self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature, self._compared_values)
+        self.track('network', '_network_helpers', 'summerize_connections', None)
+        # else:
+        #     self.network_summary = _network_helpers.summerize_entity(self.network_map, self._compared_columns, self._df['df'])
+        #     self.track('network', '_network_helpers', 'summerize_entity', None)
+
+        # resolve entities if names were compared
+        # if 'name' in self.network_feature:
+        #     self.entity_map, self.network_map = _network_helpers.resolve_entity(self.network_map, self.network_feature, self._df['df'])
+        #     self.track('network', '_network_helpers', 'resolve_entity', None)
             
 
     def debug_similar(self, category, cluster_edge_limit=5):
 
         # select similarity score for given category
-        score = self._similarity_score[category]
+        score = self.similarity_score[category]
         
         # set node and node_similar as columns for merging in processed values
         score = score.reset_index()
