@@ -92,7 +92,7 @@ class entity_resolver(operation_tracker, network_dashboard):
 
         Parameters
         ----------
-        category (str): alphanumeric, name, phone, email, email_domain, or address
+        category (str): generic_id, name, phone, email, email_domain, or address
         columns (str|list|dict): columns in the first/second dataframe to compare for each category
         thresold (float, default=1): find values that exactly match (1) or within similar threshold (>0 to <1)
         kneighbors (int): TODO: test and document affect of kneighbors
@@ -110,10 +110,15 @@ class entity_resolver(operation_tracker, network_dashboard):
         >>> er = entity_resolver(df1, df2)
         >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
 
-        Compare values that are spread across multiple columns.
+        
+        Compare values from multiple columns.
+        >>> er = entity_resolver(df)
+        >>> er.compare('phone', ['HomePhone','WordPhone','CellPhone'])
+
+        Combine columns before comparison. Columns in df2 are first combined before comparing to df.
 
         >>> er = entity_resolver(df, df2)
-        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': ['Line1','City','State','Zip']}, threshold=0.9)
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': [['Line1','City','State','Zip']]}, threshold=0.9)
 
         See Also
         --------

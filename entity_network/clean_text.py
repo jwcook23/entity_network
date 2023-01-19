@@ -86,7 +86,7 @@ def alphanumeric(values: pd.Series) -> pd.Series:
     prepared = _alphanumeric_only(prepared)
 
     return _common_poststeps(prepared)
-    
+
 
 def name(values: pd.Series, stopwords='default') -> pd.Series:
     '''Prepocess comapany and person names.
@@ -248,7 +248,7 @@ def address(values: pd.Series, stopwords='default') -> pd.Series:
 
 
 comparison_rules = {
-    "alphanumeric": {
+    "generic_id": {
         "comparer": "word",
         "cleaner": alphanumeric,
         "stopwords": None

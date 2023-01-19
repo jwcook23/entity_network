@@ -18,6 +18,9 @@ def flatten(df, columns, category):
 
     for frame, cols in columns.items():
 
+        # create a copy in case columns where originally set from one variable
+        cols = cols.copy()
+
         # skip processing df2 if not provided
         if df[frame] is None:
             continue
