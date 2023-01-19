@@ -18,9 +18,6 @@ def flatten(df, columns, category):
 
     for frame, cols in columns.items():
 
-        # create a copy in case columns where originally set from one variable
-        cols = cols.copy()
-
         # skip processing df2 if not provided
         if df[frame] is None:
             continue
@@ -28,6 +25,9 @@ def flatten(df, columns, category):
         # change string to a list for potentially stacking of multiple columns
         if isinstance(cols, str):
             cols = [cols]
+        # create a copy in case columns where originally set from one variable
+        elif isinstance(cols, list):
+            cols = cols.copy()
 
         # combine multiple columns into single if nested list
         split_cols = [idx for idx,nested in enumerate(cols) if isinstance(nested, list)]

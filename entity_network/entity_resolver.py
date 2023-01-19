@@ -86,6 +86,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         # initialize performance time tracking and logging
         operation_tracker.__init__(self)
 
+
     def compare(self, category, columns, threshold:float=1, kneighbors:int=10):
         ''' Compare columns in a single dataframe or two dataframes to find relationships
         used to resolve entities and find networks.
@@ -262,7 +263,76 @@ class entity_resolver(operation_tracker, network_dashboard):
         # if 'name' in self.network_feature:
         #     self.entity_map, self.network_map = _network_helpers.resolve_entity(self.network_map, self.network_feature, self._df['df'])
         #     self.track('network', '_network_helpers', 'resolve_entity', None)
-            
+    
+    def _join_contents(self, df, column_name_regex, remove_extra_newlines=True):
+        # TODO: move method somewhere
+
+        contents = df.loc[:,
+            df.columns.str.contains(column_name_regex, regex=True)
+        ].copy()
+
+        contents = contents.fillna('')
+        contents = contents.apply('\n'.join, axis='columns')
+        if remove_extra_newlines:
+            contents = contents.replace('^\n+|\n+$|','',regex=True)
+            contents = contents.replace('\n{2,}', '\n', regex=True)
+
+        return contents
+
+
+    def _combine_records(self, df, df_name):
+        # TODO: move method somewhere
+
+        combined = df[[f'{df_name}_index']]
+        combined = combined.reset_index()
+        combined = combined.explode(f'{df_name}_index')
+
+        combined = combined.merge(self._index_mask[df_name].reset_index(), how='left', on=f'{df_name}_index')
+        combined = combined.merge(self._df[df_name], how='left', on='node')
+
+        combined = combined.drop(columns=[f'{df_name}_index','node'])
+        columns = combined.columns.drop('network_id')
+
+        combined[columns] = combined[columns].fillna('').astype('str')
+        combined = combined.groupby('network_id')
+        combined = combined.agg({col: list for col in columns})
+        combined = combined.applymap('\n'.join)
+
+        renamed = pd.DataFrame({'column': combined.columns})
+        renamed[df_name] = df_name+'_'+renamed['column']
+
+        combined.columns = renamed[df_name]
+
+        return combined, renamed
+
+
+    def df_comparison(self):
+
+        comparison = self.network_summary[['df_index','df2_index']].copy()
+
+        comparison['df_columns'] = self._join_contents(self.network_summary, '^df_column')
+        comparison['df2_columns'] = self._join_contents(self.network_summary, '^df2_column')
+
+        comparison['missing_text'] = self._join_contents(self.network_summary, '_difference$')
+
+        records_df, renamed_df = self._combine_records(comparison, 'df')
+        comparison = comparison.merge(records_df, on='network_id')
+
+        records_df2, renamed_df2 = self._combine_records(comparison, 'df2')
+        comparison = comparison.merge(records_df2, on='network_id')
+
+        order = renamed_df.merge(renamed_df2, on='column', how='outer')
+        order['priority'] = order[['df','df2']].notna().all(axis='columns')
+        order = order.sort_values('priority', ascending=False)
+        columns = order[['df','df2']].values.flatten()
+        columns = columns[~pd.isnull(columns)].tolist()
+        columns = ['df_columns','df2_columns','missing_text'] + columns
+        comparison = comparison[columns]
+
+
+        # comparison.to_csv('test.csv')
+
+        print(1)
 
     def debug_similar(self, category, cluster_edge_limit=5):
 
