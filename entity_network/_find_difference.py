@@ -1,7 +1,7 @@
 from collections import Counter
 from itertools import chain
 
-from entity_network.clean_text import settings
+from entity_network.clean_text import comparison_rules
 from entity_network import parse_components
 
 def main(values, category):
@@ -12,7 +12,7 @@ def main(values, category):
     elif category=='phone':
         parsed = parse_components.phone(values[category])
     else:
-        delimiter = settings[category]['comparer']
+        delimiter = comparison_rules[category]['comparer']
         parsed = parse_components.common(values[category], delimiter=delimiter)
 
     # alias names for later merges that include multiple categories

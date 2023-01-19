@@ -130,7 +130,10 @@ def test_nothing_similar():
     er = entity_resolver(df1, df2)
     er.compare('address', columns={'df': 'AddressA', 'df2': 'AddressA'}, threshold=0.8)
 
+    er.network()
+
     assert len(er.network_feature['address'])==0
+    assert len(er.network_id)==0
 
 
 def test_combine_similar_exact():

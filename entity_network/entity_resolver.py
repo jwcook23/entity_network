@@ -1,11 +1,10 @@
-'''Find matching values in a column of data. Matches may be exact or similar according to a threshold.'''
 from collections import OrderedDict
 import json
 
 import pandas as pd
 
 from entity_network import _index, _prepare, _compare_records, _network_helpers, _exceptions, _debug
-from entity_network.clean_text import settings
+from entity_network.clean_text import comparison_rules
 from entity_network._performance_tracker import operation_tracker
 from entity_network.network_plotter import network_dashboard
 
@@ -13,9 +12,60 @@ class entity_resolver(operation_tracker, network_dashboard):
 
 
     def __init__(self, df:pd.DataFrame, df2:pd.DataFrame = None):
+        ''' Find links in a single dataframe or two dataframes for
+        entity resolution and/or network link analysis.
 
-        # read global settings file
-        self.settings = settings
+        TODO: validate documentation
+
+        Parameters
+        ----------
+        df (pandas.DataFrame): first dataframe containing entity features
+        df2 (pandas.DataFrame, default=None): second dataframe containing entity features
+
+        Properties
+        ----------
+        er.network_id (pd.DataFrame): 
+        er.network_map (pd.DataFrame):
+        er.entity_map (pd.DataFrame | None): 
+        er.network_summary (pd.DataFrame): 
+
+        Examples
+        --------
+
+        Resolve entities and find networks in a single dataframe.
+
+        >>> df = pd.DataFrame(columns=['Name','Phone','Address'])
+        >>> er = entity_resolver(df)
+        >>> er.compare('name', columns='Name')
+        >>> er.compare('phone', columns='Phone')
+        >>> er.compare('address', columns='Address', threshold=0.9)
+        >>> er.network()
+
+        Resolve entities and find networks in two dataframes.
+
+        >>> df = pd.DataFrame(columns=['NameCol1','PhoneCol1','AddressCol1'])
+        >>> df2 = pd.DataFrame(columns=['NameCol2','PhoneNameCol2','AddressCol2'])
+        >>> er = entity_resolver(df, df2)
+        >>> er.compare('name', columns={'df': 'NameCol1', 'df2': 'NameCol2'})
+        >>> er.compare('phone', columns={'df': 'Phone1', 'df2': 'PhoneCol2'})
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
+        >>> er.network()
+
+        Find networks in two dataframes. Entities aren't resolved as name are not compared.
+
+        >>> df = pd.DataFrame(columns=['NameCol1','PhoneCol1','AddressCol1'])
+        >>> df2 = pd.DataFrame(columns=['NameCol2','PhoneNameCol2','AddressCol2'])
+        >>> er = entity_resolver(df, df2)
+        >>> er.compare('phone', columns={'df': 'Phone1', 'df2': 'PhoneCol2'})
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
+        >>> er.network()
+
+        See Also
+        --------
+        compare: methods to compare values
+        network: resolve entities and form final network relationships
+
+        '''
 
         # assign globally unique node value
         self._df, self._index_mask = _index.assign_node(df, df2)
@@ -35,10 +85,43 @@ class entity_resolver(operation_tracker, network_dashboard):
         operation_tracker.__init__(self)
 
     def compare(self, category, columns, threshold:float=1, kneighbors:int=10):
+        ''' Compare columns in a single dataframe or two dataframes to find relationships
+        used to resolve entities and find networks.
+
+        Parameters
+        ----------
+        category (str): 
+        columns (str|list|dict): 
+        thresold (float, default=1): 
+        kneighbors (int): TODO: test and document affect of kneighbors
+
+        Examples
+        --------
+
+        Compare values in a single dataframe.
+
+        >>> er = entity_resolver(df)
+        >>> er.compare('name', columns='Name')
+
+        Compare values between two dataframes with a similarity threshold.
+
+        >>> er = entity_resolver(df1, df2)
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
+
+        Compare values that are spread across multiple columns.
+
+        >>> er = entity_resolver(df, df2)
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': ['Line1','City','State','Zip']}, threshold=0.9)
+
+        See Also
+        --------
+        network: resolve entities and form final network relationships
+
+        '''
 
         # input arguments
-        if not category in settings.keys():
-            raise _exceptions.InvalidCategory(f'Argument category must be one of {list(settings.keys())}')
+        if not category in comparison_rules.keys():
+            raise _exceptions.InvalidCategory(f'Argument category must be one of {list(comparison_rules.keys())}')
         if not isinstance(kneighbors, int) or kneighbors<0:
             raise _exceptions.KneighborsRange('Argument kneighbors must be a positive integer.')
         if threshold<=0 or threshold>1:
@@ -52,7 +135,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.track('compare', '_prepare', 'flatten', category)
 
         # clean column text
-        text_cleaner = self.settings[category]['cleaner']
+        text_cleaner = comparison_rules[category]['cleaner']
         self._compared_values[category] = _prepare.clean(self._compared_values[category], category, text_cleaner)
         self.track('compare', '_prepare', 'clean', category)
 
@@ -71,7 +154,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         else:
 
             # create term frequency–inverse document frequency matrix to numerically compare text
-            text_comparer = self.settings[category]['comparer']
+            text_comparer = comparison_rules[category]['comparer']
             tfidf, tfidf_index = _compare_records.create_tfidf(self._compared_values[category], text_comparer)
             self.track('compare', '_compare_records', 'create_tfidf', category)
 
@@ -113,6 +196,37 @@ class entity_resolver(operation_tracker, network_dashboard):
 
 
     def network(self):
+        ''' Summerize network relationships and resolve entities if names were compared.
+
+        Parameters
+        ----------
+        None
+
+        Examples
+        --------
+        Resolve entities and find networks in two dataframes.
+
+        >>> df = pd.DataFrame(columns=['NameCol1','PhoneCol1','AddressCol1'])
+        >>> df2 = pd.DataFrame(columns=['NameCol2','PhoneNameCol2','AddressCol2'])
+        >>> er = entity_resolver(df, df2)
+        >>> er.compare('name', columns={'df': 'NameCol1', 'df2': 'NameCol2'})
+        >>> er.compare('phone', columns={'df': 'Phone1', 'df2': 'PhoneCol2'})
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
+        >>> er.network()
+
+        Find networks in two dataframes. Entities aren't resolved as name are not compared.
+
+        >>> df = pd.DataFrame(columns=['NameCol1','PhoneCol1','AddressCol1'])
+        >>> df2 = pd.DataFrame(columns=['NameCol2','PhoneNameCol2','AddressCol2'])
+        >>> er = entity_resolver(df, df2)
+        >>> er.compare('phone', columns={'df': 'Phone1', 'df2': 'PhoneCol2'})
+        >>> er.compare('address', columns={'df': 'AddressCol1', 'df2': 'AddressCol2'}, threshold=0.9)
+        >>> er.network()   
+
+        See Also
+        --------
+        compare: methods to compare values    
+        '''
 
         # initialize timer for tracking duration
         self.reset_time()

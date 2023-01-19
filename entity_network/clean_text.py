@@ -41,7 +41,7 @@ def _remove_stopwords(prepared, stopwords, category):
     if stopwords is None:
         return prepared
     elif stopwords=='default':
-        stopwords = settings[category]['stopwords']
+        stopwords = comparison_rules[category]['stopwords']
     
     pattern = r'\b(?:{})\b'.format('|'.join(stopwords))
     prepared = prepared.str.replace(pattern, '', regex=True)
@@ -228,7 +228,7 @@ def address(values: pd.Series, stopwords='default') -> pd.Series:
 
     return _common_poststeps(prepared)
 
-settings = {
+comparison_rules = {
     "name": {
         "comparer": "char", 
         "cleaner": name,

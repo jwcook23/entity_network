@@ -178,8 +178,9 @@ def summerize_connections(network_id, network_feature, processed):
     # form a single comma seperated feature column
     network_summary[column_feature] = network_summary[column_feature].fillna('')
     network_summary['feature_match'] = network_summary[column_feature].apply(lambda x: ','.join(x), axis='columns')
-    network_summary['feature_match'] = network_summary['feature_match'].str.replace(',{2,}', ',', regex=True)
-    network_summary['feature_match'] = network_summary['feature_match'].str.replace('^,|,$', '', regex=True)
+    if len(network_summary)>0:
+        network_summary['feature_match'] = network_summary['feature_match'].str.replace(',{2,}', ',', regex=True)
+        network_summary['feature_match'] = network_summary['feature_match'].str.replace('^,|,$', '', regex=True)
     network_summary = network_summary.drop(columns=column_feature)
 
     return network_summary
