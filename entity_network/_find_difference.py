@@ -19,30 +19,33 @@ def main(values, category):
     alias = {'parsed': f'{category}_normalized', 'components': f'{category}_difference'}
 
     # include source column descriptions if provided
-    summary = {'parsed': list, 'components': list}
-    list_notna = lambda x: list(x.dropna())
+    plan = {'parsed': list, 'components': list}
+    list_unique_notna = lambda x: list(x.drop_duplicates().dropna())
     if 'df2_column' in values:
         parsed['df2_column'] = values['df2_column']
-        summary = {**{'df2_column': list_notna}, **summary}
+        plan = {**{'df2_column': list_unique_notna}, **plan}
         alias = {**{'df2_column': f'df2_column_{category}'}, **alias}
     if 'df_column' in values:
         parsed['df_column'] = values['df_column']
-        summary = {**{'df_column': list_notna}, **summary}
+        plan = {**{'df_column': list_unique_notna}, **plan}
         alias = {**{'df_column': f'df_column_{category}'}, **alias}
 
     # group components by id
-    values = parsed.groupby(values.index.name)
-    values = values.agg(summary)
+    summary = parsed.groupby(values.index.name)
+    summary = summary.agg(plan)
 
     # calculate the difference in components
-    values['components'] = values['components'].apply(_term_diff)
+    summary['components'] = summary['components'].apply(_term_diff)
 
     # rename columns to reflect category for later merging and after difference is found
-    values = values.rename(columns=alias)
+    summary = summary.rename(columns=alias)
 
-    return values
+    return summary
 
 def _term_diff(values):
+
+    if values[0] is None or values[1] is None:
+        return None
 
     frequency = Counter(chain(*values))
     difference = ['='.join(key) for key,val in frequency.items() if val==1 and key[1] is not None]

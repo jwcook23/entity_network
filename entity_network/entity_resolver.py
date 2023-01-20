@@ -75,6 +75,9 @@ class entity_resolver(operation_tracker, network_dashboard):
         # preprocessed text values
         self._compared_values = {}
 
+        # exact matches removed before finding similar matches
+        self._df_exact = {}
+
         # outputs from compare method
         self.network_feature = {}
         self.similarity_score = {}
@@ -148,7 +151,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         self.track('compare', '_prepare', 'clean', category)
 
         # find exact matches
-        related_feature, self._df_exact = _compare_records.exact_match(self._compared_values[category])
+        related_feature, self._df_exact[category] = _compare_records.exact_match(self._compared_values[category])
         self.track('compare', '_compare_records', 'exact_match', category)
 
         # find similar matches
@@ -183,7 +186,7 @@ class entity_resolver(operation_tracker, network_dashboard):
             self.track('compare', '_compare_records', 'combined_id', category)
 
             # include duplicated values in the first df related to a value in the second
-            related_feature, similar_score = _compare_records.fill_exact(related_feature, similar_score, self._df_exact)
+            related_feature, similar_score = _compare_records.fill_exact(related_feature, similar_score, self._df_exact[category])
             self.track('compare', '_compare_records', 'fill_exact', category)
 
         # remove matches that do not match another index (columns for a category may contain the same value for a given record)
@@ -253,7 +256,7 @@ class entity_resolver(operation_tracker, network_dashboard):
 
         # summerize the network by connections or by entity if names were compared
         # if self.entity_map is None:
-        self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature, self._compared_values)
+        self.network_summary = _network_helpers.summerize_connections(self.network_id, self.network_feature, self._compared_values, self._df_exact)
         self.track('network', '_network_helpers', 'summerize_connections', None)
         # else:
         #     self.network_summary = _network_helpers.summerize_entity(self.network_map, self._compared_columns, self._df['df'])
@@ -306,20 +309,20 @@ class entity_resolver(operation_tracker, network_dashboard):
         return combined, renamed
 
 
-    def df_comparison(self):
+    def get_network_report(self):
 
-        comparison = self.network_summary[['df_index','df2_index']].copy()
+        self.network_report = self.network_summary[['df_index','df2_index']].copy()
 
-        comparison['df_columns'] = self._join_contents(self.network_summary, '^df_column')
-        comparison['df2_columns'] = self._join_contents(self.network_summary, '^df2_column')
+        self.network_report['df_columns'] = self._join_contents(self.network_summary, '^df_column')
+        self.network_report['df2_columns'] = self._join_contents(self.network_summary, '^df2_column')
 
-        comparison['missing_text'] = self._join_contents(self.network_summary, '_difference$')
+        self.network_report['missing_text'] = self._join_contents(self.network_summary, '_difference$')
 
-        records_df, renamed_df = self._combine_records(comparison, 'df')
-        comparison = comparison.merge(records_df, on='network_id')
+        records_df, renamed_df = self._combine_records(self.network_report, 'df')
+        self.network_report = self.network_report.merge(records_df, on='network_id')
 
-        records_df2, renamed_df2 = self._combine_records(comparison, 'df2')
-        comparison = comparison.merge(records_df2, on='network_id')
+        records_df2, renamed_df2 = self._combine_records(self.network_report, 'df2')
+        self.network_report = self.network_report.merge(records_df2, on='network_id')
 
         order = renamed_df.merge(renamed_df2, on='column', how='outer')
         order['priority'] = order[['df','df2']].notna().all(axis='columns')
@@ -327,12 +330,8 @@ class entity_resolver(operation_tracker, network_dashboard):
         columns = order[['df','df2']].values.flatten()
         columns = columns[~pd.isnull(columns)].tolist()
         columns = ['df_columns','df2_columns','missing_text'] + columns
-        comparison = comparison[columns]
+        self.network_report = self.network_report[columns]
 
-
-        # comparison.to_csv('test.csv')
-
-        print(1)
 
     def debug_similar(self, category, cluster_edge_limit=5):
 
@@ -343,7 +342,7 @@ class entity_resolver(operation_tracker, network_dashboard):
         score = score.reset_index()
 
         # add the main processed/cleaned values from the first df
-        score = _debug.first_df(score, self._compared_values[category], category, self._df_exact)
+        score = _debug.first_df(score, self._compared_values[category], category, self._df_exact[category])
 
         # add the similar processed/cleaned values from the first or second df
         score = _debug.similar_values(score, self._compared_values[category], category)     

@@ -134,7 +134,22 @@ def summerize_entity(network_map, compared_columns, df):
     return network_summary
 
 
-def summerize_connections(network_id, network_feature, processed):
+def _add_processed_values(feature, processed, exact, category, df_name):
+
+    # add processed values
+    values = feature.merge(processed[category][df_name], on=['node','column'], how='inner')
+    values = values.rename(columns={'column': f'{df_name}_column'})
+
+    # include exactly equal processed values
+    same = exact[category][['node','column']].merge(values[[category]], left_on='node_first', right_on='node')
+    same = same.set_index('node').rename(columns={'column': f'{df_name}_column'})
+
+    values = pd.concat([values, same])
+
+    return values
+
+
+def summerize_connections(network_id, network_feature, processed, exact):
 
     # TODO: implement single df summary
     if 'df2_index' not in network_id:
@@ -150,20 +165,23 @@ def summerize_connections(network_id, network_feature, processed):
     # find matched categories and differences between values
     column_feature = []
     for category, feature in network_feature.items():
-        # determine column name and add processed values
+
         feature = feature[['column']]
-        df = feature.merge(processed[category]['df'], on=['node','column'], how='inner')
-        df = df.rename(columns={'column': 'df_column'})
-        df2 = feature.merge(processed[category]['df2'], on=['node','column'], how='inner')
-        df2 = df2.rename(columns={'column': 'df2_column'})
+
+        df = _add_processed_values(feature, processed, exact, category, 'df')
+        df2 = _add_processed_values(feature, processed, exact, category, 'df2')
         feature = pd.concat([df,df2])
         feature = feature.merge(network_id[['network_id']], on='node', how='inner')
-        # group values by id and calculate term differences
+        
         feature = feature.set_index('network_id')
         feature = _find_difference.main(feature, category)
+
         # combine features in delimited format for external source use
         for col in feature.columns:
-            feature[col] = feature[col].apply(lambda x: ','.join(x))
+            error = feature[col].isna()
+            feature[col].loc[error] = [[]]*sum(error)
+            feature[col] = feature[col].apply(lambda x: '[&]'.join(x))
+            feature[col].loc[error] = 'Parsing Error'
 
         # set a matching feature column
         column = f'{category}_feature'
@@ -173,7 +191,7 @@ def summerize_connections(network_id, network_feature, processed):
         # add values into network summary
         network_summary = network_summary.merge(feature, on='network_id', how='left')
         empty = feature.columns.drop(column)
-        network_summary[empty] = network_summary[empty].where(pd.notnull(network_summary[empty]), None)
+        network_summary[empty] = network_summary[empty].where(pd.notnull(network_summary[empty]), pd.NA)
         network_summary[column] = network_summary[column].fillna('')
 
     # form a single comma seperated feature column

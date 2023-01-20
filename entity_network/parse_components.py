@@ -48,7 +48,7 @@ def phone(values):
                 parsed += ' ext '+str(components['Extension'])
             components = set(components.items())
         except phonenumbers.phonenumberutil.NumberParseException:
-            components = set(['Error'])
+            components = None
             parsed = re.sub(r'[^0-9\s]+', '', value)
         return components, parsed
     
@@ -69,7 +69,7 @@ def address(values):
             parsed = ' '.join([str(val) for val in components.values() if val is not None])
             components = set(components.items())
         except:
-            components = set(['Error'])
+            components = None
             parsed = value
         return components, parsed
 
