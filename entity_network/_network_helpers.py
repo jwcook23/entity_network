@@ -180,7 +180,7 @@ def summerize_connections(network_id, network_feature, processed, exact):
         for col in feature.columns:
             error = feature[col].isna()
             feature[col].loc[error] = [[]]*sum(error)
-            feature[col] = feature[col].apply(lambda x: '[&]'.join(x))
+            feature[col] = feature[col].apply(lambda x: '\n'.join(x))
             feature[col].loc[error] = 'Parsing Error'
 
         # set a matching feature column
